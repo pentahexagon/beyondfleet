@@ -22,6 +22,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'resources.cryptocompare.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'picsum.photos',
+      },
     ],
   },
 }

@@ -64,6 +64,7 @@ export default function Header() {
     { href: '/', label: '홈' },
     { href: '/prices', label: '시세' },
     { href: '/news', label: '뉴스' },
+    { href: '/nft', label: 'NFT' },
     { href: '/membership', label: '멤버십' },
     { href: '/giving', label: '기부' },
     { href: '/learn', label: '교육' },

@@ -10,6 +10,18 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'coin-images.coingecko.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'images.cryptocompare.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.cryptocompare.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'resources.cryptocompare.com',
+      },
     ],
   },
 }

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { getMarketData } from '@/lib/coingecko'
-import PriceCard from '@/components/crypto/PriceCard'
+import LivePriceSection from '@/components/crypto/LivePriceSection'
 import Button from '@/components/ui/Button'
 import { MEMBERSHIP_TIERS } from '@/types'
 
@@ -80,35 +80,7 @@ export default async function Home() {
       </section>
 
       {/* Live Prices Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
-                실시간 시세
-              </h2>
-              <p className="text-gray-400">상위 10개 암호화폐</p>
-            </div>
-            <Link href="/prices">
-              <Button variant="ghost">
-                전체 보기 →
-              </Button>
-            </Link>
-          </div>
-
-          {topCoins.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-              {topCoins.slice(0, 10).map((coin) => (
-                <PriceCard key={coin.id} coin={coin} />
-              ))}
-            </div>
-          ) : (
-            <div className="glass rounded-xl p-8 text-center">
-              <p className="text-gray-400">시세 데이터를 불러오는 중...</p>
-            </div>
-          )}
-        </div>
-      </section>
+      <LivePriceSection initialCoins={topCoins} />
 
       {/* Mission Section */}
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-transparent via-purple-900/10 to-transparent">

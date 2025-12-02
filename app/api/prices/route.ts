@@ -5,16 +5,20 @@ const COINGECKO_API_BASE = 'https://api.coingecko.com/api/v3'
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const page = searchParams.get('page') || '1'
-  const perPage = searchParams.get('per_page') || '20'
+  const perPage = searchParams.get('per_page') || '10'
   const search = searchParams.get('search') || ''
+  const sortBy = searchParams.get('sort_by') || 'market_cap'
+  const sortOrder = searchParams.get('sort_order') || 'desc'
 
   try {
+    // Fetch 100 coins for client-side sorting/filtering
     const url = new URL(`${COINGECKO_API_BASE}/coins/markets`)
     url.searchParams.set('vs_currency', 'usd')
     url.searchParams.set('order', 'market_cap_desc')
-    url.searchParams.set('per_page', search ? '250' : perPage)
-    url.searchParams.set('page', search ? '1' : page)
+    url.searchParams.set('per_page', '100')
+    url.searchParams.set('page', '1')
     url.searchParams.set('sparkline', 'false')
+    url.searchParams.set('price_change_percentage', '24h')
 
     const response = await fetch(url.toString(), {
       next: { revalidate: 60 },
@@ -39,11 +43,30 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Sort coins
+    const sortKey = sortBy === 'price' ? 'current_price'
+                  : sortBy === 'change' ? 'price_change_percentage_24h'
+                  : sortBy === 'volume' ? 'total_volume'
+                  : 'market_cap'
+
+    coins.sort((a: Record<string, number>, b: Record<string, number>) => {
+      const aVal = a[sortKey] ?? 0
+      const bVal = b[sortKey] ?? 0
+      return sortOrder === 'asc' ? aVal - bVal : bVal - aVal
+    })
+
+    // Paginate
+    const pageNum = parseInt(page)
+    const perPageNum = parseInt(perPage)
+    const startIndex = (pageNum - 1) * perPageNum
+    const paginatedCoins = coins.slice(startIndex, startIndex + perPageNum)
+
     return NextResponse.json({
-      coins,
+      coins: paginatedCoins,
       total: coins.length,
-      page: parseInt(page),
-      per_page: parseInt(perPage),
+      page: pageNum,
+      per_page: perPageNum,
+      total_pages: Math.ceil(coins.length / perPageNum),
     })
   } catch (error) {
     console.error('Error fetching prices:', error)

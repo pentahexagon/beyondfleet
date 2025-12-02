@@ -3,6 +3,7 @@ import { Inter, Space_Grotesk } from 'next/font/google'
 import './globals.css'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
+import Web3Provider from '@/components/providers/Web3Provider'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -34,11 +35,13 @@ export default function RootLayout({
   return (
     <html lang="ko" className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <body className="font-sans antialiased min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-grow pt-16">
-          {children}
-        </main>
-        <Footer />
+        <Web3Provider>
+          <Header />
+          <main className="flex-grow pt-16">
+            {children}
+          </main>
+          <Footer />
+        </Web3Provider>
       </body>
     </html>
   )

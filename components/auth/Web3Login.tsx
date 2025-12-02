@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useAccount, useDisconnect } from 'wagmi'
 import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { useWallet } from '@solana/wallet-adapter-react'
@@ -13,8 +13,6 @@ interface Web3LoginProps {
 }
 
 export default function Web3Login({ onSuccess, onError }: Web3LoginProps) {
-  const hasCalledSuccess = useRef(false)
-
   // Ethereum (wagmi + rainbowkit)
   const { address: ethAddress, isConnected: isEthConnected } = useAccount()
   const { openConnectModal } = useConnectModal()
@@ -27,11 +25,13 @@ export default function Web3Login({ onSuccess, onError }: Web3LoginProps) {
   const solAddress = publicKey?.toBase58()
   const isConnected = isEthConnected || isSolConnected
 
-  // 지갑 연결되면 즉시 모달 닫기
+  // 지갑 연결되면 1초 후 모달 닫기
   useEffect(() => {
-    if (isConnected && !hasCalledSuccess.current) {
-      hasCalledSuccess.current = true
-      onSuccess()
+    if (isConnected) {
+      const timer = setTimeout(() => {
+        onSuccess()
+      }, 1000)
+      return () => clearTimeout(timer)
     }
   }, [isConnected, onSuccess])
 
@@ -49,7 +49,6 @@ export default function Web3Login({ onSuccess, onError }: Web3LoginProps) {
 
   // Disconnect all wallets
   const handleDisconnect = () => {
-    hasCalledSuccess.current = false
     if (isEthConnected) disconnectEth()
     if (isSolConnected) disconnectSolana()
   }

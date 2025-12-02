@@ -10,6 +10,9 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@rainbow-me/rainbowkit": "^2.1.0",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-react": "^0.15.39",
@@ -19,9 +22,13 @@
     "@supabase/supabase-js": "^2.45.0",
     "@tanstack/react-query": "^5.90.11",
     "bs58": "^6.0.0",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^0.555.0",
     "next": "14.2.5",
     "react": "^18.3.1",
+    "react-big-calendar": "^1.19.4",
     "react-dom": "^18.3.1",
+    "recharts": "^3.5.1",
     "tweetnacl": "^1.0.3",
     "viem": "^2.40.3",
     "wagmi": "^2.12.0"
@@ -29,6 +36,7 @@
   "devDependencies": {
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
+    "@types/react-big-calendar": "^1.16.3",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.19",
     "eslint": "^8.57.0",

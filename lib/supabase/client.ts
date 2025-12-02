@@ -14,3 +14,6 @@ const createSupabaseClient = (): SupabaseClient => {
 }
 
 export const supabase = createSupabaseClient()
+
+// Re-export createClient function for dynamic client creation
+export { createSupabaseClient as createClient }

@@ -2,13 +2,15 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { useAccount } from 'wagmi'
+import { useRouter } from 'next/navigation'
+import { useAccount, useDisconnect } from 'wagmi'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { supabase } from '@/lib/supabase/client'
 import AuthModal from '@/components/auth/AuthModal'
 import Button from '@/components/ui/Button'
 
 export default function Header() {
+  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const [authModalTab, setAuthModalTab] = useState<'web2' | 'web3'>('web2')
@@ -16,7 +18,8 @@ export default function Header() {
 
   // Web3 wallet states
   const { address: ethAddress, isConnected: isEthConnected } = useAccount()
-  const { publicKey: solPublicKey, connected: isSolConnected } = useWallet()
+  const { disconnect: disconnectEth } = useDisconnect()
+  const { publicKey: solPublicKey, connected: isSolConnected, disconnect: disconnectSol } = useWallet()
 
   const isWalletConnected = isEthConnected || isSolConnected
   const walletAddress = ethAddress || solPublicKey?.toBase58()
@@ -36,8 +39,20 @@ export default function Header() {
   }, [])
 
   const handleLogout = async () => {
+    // Supabase 로그아웃
     await supabase.auth.signOut()
     setUser(null)
+
+    // 지갑 연결 해제
+    if (isEthConnected) {
+      disconnectEth()
+    }
+    if (isSolConnected) {
+      disconnectSol()
+    }
+
+    // 메인 페이지로 이동
+    router.push('/')
   }
 
   const openAuthModal = (tab: 'web2' | 'web3' = 'web2') => {
@@ -53,9 +68,23 @@ export default function Header() {
     { href: '/learn', label: '교육' },
   ]
 
-  const displayAddress = walletAddress
-    ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`
-    : null
+  // 표시할 주소/이메일 결정
+  const getDisplayName = () => {
+    if (walletAddress) {
+      return `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+    }
+    if (user?.email) {
+      // 이메일이 지갑 주소 형식이면 주소 표시
+      if (user.email.includes('@wallet.')) {
+        const addr = user.email.split('@')[0]
+        return `${addr.slice(0, 6)}...${addr.slice(-4)}`
+      }
+      return user.email.split('@')[0]
+    }
+    return null
+  }
+
+  const displayName = getDisplayName()
 
   return (
     <>
@@ -83,53 +112,21 @@ export default function Header() {
 
             {/* Auth Buttons */}
             <div className="hidden md:flex items-center space-x-3">
-              {user ? (
-                // Logged in state
+              {user || isWalletConnected ? (
+                // 로그인 상태
                 <div className="flex items-center space-x-3">
-                  {isWalletConnected && (
-                    <span className="text-xs text-cyan-400 bg-cyan-400/10 px-2 py-1 rounded-full font-mono">
-                      {displayAddress}
-                    </span>
-                  )}
-                  <Link href="/profile">
-                    <Button variant="ghost" size="sm">
-                      프로필
-                    </Button>
-                  </Link>
+                  <span className="text-sm text-cyan-400 bg-cyan-400/10 px-3 py-1.5 rounded-full font-mono">
+                    {displayName}
+                  </span>
                   <Button variant="outline" size="sm" onClick={handleLogout}>
                     로그아웃
                   </Button>
                 </div>
               ) : (
-                // Logged out state
-                <>
-                  {isWalletConnected ? (
-                    <span className="text-xs text-cyan-400 bg-cyan-400/10 px-2 py-1 rounded-full font-mono">
-                      {displayAddress}
-                    </span>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openAuthModal('web3')}
-                    >
-                      🔗 지갑 연결
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => openAuthModal('web2')}
-                  >
-                    로그인
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => openAuthModal('web2')}
-                  >
-                    가입하기
-                  </Button>
-                </>
+                // 로그인 전
+                <Button size="sm" onClick={() => openAuthModal('web2')}>
+                  로그인
+                </Button>
               )}
             </div>
 
@@ -178,15 +175,11 @@ export default function Header() {
                   </Link>
                 ))}
                 <div className="flex flex-col space-y-2 pt-4 border-t border-purple-500/20">
-                  {user ? (
+                  {user || isWalletConnected ? (
                     <>
-                      <Link
-                        href="/profile"
-                        className="text-gray-300 hover:text-white text-sm"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        프로필
-                      </Link>
+                      <span className="text-cyan-400 text-sm font-mono">
+                        {displayName}
+                      </span>
                       <button
                         onClick={() => {
                           handleLogout()
@@ -198,35 +191,15 @@ export default function Header() {
                       </button>
                     </>
                   ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          openAuthModal('web3')
-                          setIsMobileMenuOpen(false)
-                        }}
-                        className="text-left text-cyan-400 text-sm"
-                      >
-                        🔗 지갑 연결
-                      </button>
-                      <button
-                        onClick={() => {
-                          openAuthModal('web2')
-                          setIsMobileMenuOpen(false)
-                        }}
-                        className="text-left text-gray-300 hover:text-white text-sm"
-                      >
-                        로그인
-                      </button>
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          openAuthModal('web2')
-                          setIsMobileMenuOpen(false)
-                        }}
-                      >
-                        가입하기
-                      </Button>
-                    </>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        openAuthModal('web2')
+                        setIsMobileMenuOpen(false)
+                      }}
+                    >
+                      로그인
+                    </Button>
                   )}
                 </div>
               </div>

@@ -1,4 +1,4 @@
-// CoinGecko API Types
+// Crypto API Types
 export interface CoinMarket {
   id: string
   symbol: string

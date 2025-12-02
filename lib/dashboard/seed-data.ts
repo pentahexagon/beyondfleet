@@ -140,7 +140,7 @@ export const BEYONDFLEET_ROADMAP: SeedTask[] = [
     phase: 'phase_3',
     estimated_hours: 12,
     subtasks: [
-      'CoinGecko API integration',
+      'Binance API integration',
       'Price table component',
       'Search functionality',
       'Pagination system',

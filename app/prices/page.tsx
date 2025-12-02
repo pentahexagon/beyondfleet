@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, Suspense, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
+import { useBinanceWebSocket, getBinanceSymbol } from '@/lib/hooks/useBinanceWebSocket'
 
 interface Coin {
   id: string
@@ -24,19 +25,25 @@ function PricesContent() {
   const searchParams = useSearchParams()
 
   const [coins, setCoins] = useState<Coin[]>([])
+  const [allCoinIds, setAllCoinIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState(searchParams.get('search') || '')
   const [sortBy, setSortBy] = useState<SortBy>('market_cap')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page') || '1'))
   const [totalPages, setTotalPages] = useState(1)
+  const [priceFlash, setPriceFlash] = useState<Record<string, 'up' | 'down' | null>>({})
+  const prevPricesRef = useRef<Record<string, number>>({})
+
+  // Binance WebSocket for real-time prices
+  const { prices: binancePrices, isConnected: wsConnected } = useBinanceWebSocket(allCoinIds)
 
   const fetchCoins = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams({
         page: currentPage.toString(),
-        per_page: '10',
+        per_page: '20',
         search,
         sort_by: sortBy,
         sort_order: sortOrder,
@@ -48,6 +55,9 @@ function PricesContent() {
       if (data.coins) {
         setCoins(data.coins)
         setTotalPages(data.total_pages || 1)
+        if (data.allCoinIds) {
+          setAllCoinIds(data.allCoinIds)
+        }
       }
     } catch (error) {
       console.error('Error fetching coins:', error)
@@ -59,6 +69,44 @@ function PricesContent() {
   useEffect(() => {
     fetchCoins()
   }, [fetchCoins])
+
+  // Get real-time price from Binance or fallback to CoinGecko
+  const getRealTimePrice = useCallback((coin: Coin): number => {
+    const binanceSymbol = getBinanceSymbol(coin.id)
+    if (binanceSymbol && binancePrices.has(binanceSymbol)) {
+      return parseFloat(binancePrices.get(binanceSymbol)!.price)
+    }
+    return coin.current_price
+  }, [binancePrices])
+
+  // Get real-time 24h change from Binance or fallback to CoinGecko
+  const getRealTimeChange = useCallback((coin: Coin): number => {
+    const binanceSymbol = getBinanceSymbol(coin.id)
+    if (binanceSymbol && binancePrices.has(binanceSymbol)) {
+      return parseFloat(binancePrices.get(binanceSymbol)!.priceChangePercent)
+    }
+    return coin.price_change_percentage_24h
+  }, [binancePrices])
+
+  // Price flash effect when price changes
+  useEffect(() => {
+    coins.forEach(coin => {
+      const currentPrice = getRealTimePrice(coin)
+      const prevPrice = prevPricesRef.current[coin.id]
+
+      if (prevPrice !== undefined && prevPrice !== currentPrice) {
+        const direction = currentPrice > prevPrice ? 'up' : 'down'
+        setPriceFlash(prev => ({ ...prev, [coin.id]: direction }))
+
+        // Clear flash after animation
+        setTimeout(() => {
+          setPriceFlash(prev => ({ ...prev, [coin.id]: null }))
+        }, 500)
+      }
+
+      prevPricesRef.current[coin.id] = currentPrice
+    })
+  }, [coins, binancePrices, getRealTimePrice])
 
   useEffect(() => {
     const params = new URLSearchParams()
@@ -99,11 +147,19 @@ function PricesContent() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-            실시간 암호화폐 시세
-          </h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl md:text-4xl font-bold text-white">
+              실시간 암호화폐 시세
+            </h1>
+            {wsConnected && (
+              <span className="flex items-center gap-1.5 px-2 py-1 bg-green-500/20 border border-green-500/30 rounded-full text-green-400 text-xs">
+                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                LIVE
+              </span>
+            )}
+          </div>
           <p className="text-gray-400">
-            상위 100개 코인 | CoinGecko API
+            상위 100개 코인 | CoinGecko + Binance WebSocket
           </p>
         </div>
 
@@ -139,7 +195,7 @@ function PricesContent() {
           {loading ? (
             <div className="p-8">
               <div className="animate-pulse space-y-4">
-                {[...Array(10)].map((_, i) => (
+                {[...Array(20)].map((_, i) => (
                   <div key={i} className="flex items-center space-x-4">
                     <div className="w-8 h-8 bg-purple-500/20 rounded-full" />
                     <div className="flex-1">
@@ -200,14 +256,20 @@ function PricesContent() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-right text-white font-mono">
-                        {formatPrice(coin.current_price)}
+                      <td className={`px-4 py-4 text-right font-mono transition-colors duration-300 ${
+                        priceFlash[coin.id] === 'up'
+                          ? 'text-green-300 bg-green-500/20'
+                          : priceFlash[coin.id] === 'down'
+                            ? 'text-red-300 bg-red-500/20'
+                            : 'text-white'
+                      }`}>
+                        {formatPrice(getRealTimePrice(coin))}
                       </td>
                       <td className={`px-4 py-4 text-right font-medium ${
-                        coin.price_change_percentage_24h >= 0 ? 'text-green-400' : 'text-red-400'
+                        getRealTimeChange(coin) >= 0 ? 'text-green-400' : 'text-red-400'
                       }`}>
-                        {coin.price_change_percentage_24h >= 0 ? '+' : ''}
-                        {coin.price_change_percentage_24h?.toFixed(2)}%
+                        {getRealTimeChange(coin) >= 0 ? '+' : ''}
+                        {getRealTimeChange(coin)?.toFixed(2)}%
                       </td>
                       <td className="px-4 py-4 text-right text-gray-300 hidden md:table-cell">
                         {formatNumber(coin.market_cap)}
@@ -287,7 +349,7 @@ function PricesLoading() {
         </div>
         <div className="glass rounded-xl p-8">
           <div className="animate-pulse space-y-4">
-            {[...Array(10)].map((_, i) => (
+            {[...Array(20)].map((_, i) => (
               <div key={i} className="flex items-center space-x-4">
                 <div className="w-8 h-8 bg-purple-500/20 rounded-full" />
                 <div className="flex-1">

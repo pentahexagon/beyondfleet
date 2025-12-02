@@ -5,13 +5,13 @@ const COINGECKO_API_BASE = 'https://api.coingecko.com/api/v3'
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const page = searchParams.get('page') || '1'
-  const perPage = searchParams.get('per_page') || '10'
+  const perPage = searchParams.get('per_page') || '20'
   const search = searchParams.get('search') || ''
   const sortBy = searchParams.get('sort_by') || 'market_cap'
   const sortOrder = searchParams.get('sort_order') || 'desc'
 
   try {
-    // Fetch 100 coins for client-side sorting/filtering
+    // Fetch 100 coins from CoinGecko for metadata
     const url = new URL(`${COINGECKO_API_BASE}/coins/markets`)
     url.searchParams.set('vs_currency', 'usd')
     url.searchParams.set('order', 'market_cap_desc')
@@ -61,8 +61,12 @@ export async function GET(request: NextRequest) {
     const startIndex = (pageNum - 1) * perPageNum
     const paginatedCoins = coins.slice(startIndex, startIndex + perPageNum)
 
+    // Return all coin IDs for WebSocket subscription
+    const allCoinIds = coins.map((c: { id: string }) => c.id)
+
     return NextResponse.json({
       coins: paginatedCoins,
+      allCoinIds,
       total: coins.length,
       page: pageNum,
       per_page: perPageNum,

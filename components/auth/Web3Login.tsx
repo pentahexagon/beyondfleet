@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useAccount, useDisconnect } from 'wagmi'
 import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { useWallet } from '@solana/wallet-adapter-react'
@@ -13,7 +13,6 @@ interface Web3LoginProps {
 }
 
 export default function Web3Login({ onSuccess, onError }: Web3LoginProps) {
-  const [countdown, setCountdown] = useState<number | null>(null)
   const hasCalledSuccess = useRef(false)
 
   // Ethereum (wagmi + rainbowkit)
@@ -28,26 +27,11 @@ export default function Web3Login({ onSuccess, onError }: Web3LoginProps) {
   const solAddress = publicKey?.toBase58()
   const isConnected = isEthConnected || isSolConnected
 
-  // 지갑 연결되면 2초 후 자동으로 모달 닫기
+  // 지갑 연결되면 즉시 모달 닫기
   useEffect(() => {
     if (isConnected && !hasCalledSuccess.current) {
-      setCountdown(2)
-
-      const timer = setInterval(() => {
-        setCountdown(prev => {
-          if (prev === null || prev <= 1) {
-            clearInterval(timer)
-            if (!hasCalledSuccess.current) {
-              hasCalledSuccess.current = true
-              onSuccess()
-            }
-            return null
-          }
-          return prev - 1
-        })
-      }, 1000)
-
-      return () => clearInterval(timer)
+      hasCalledSuccess.current = true
+      onSuccess()
     }
   }, [isConnected, onSuccess])
 
@@ -66,7 +50,6 @@ export default function Web3Login({ onSuccess, onError }: Web3LoginProps) {
   // Disconnect all wallets
   const handleDisconnect = () => {
     hasCalledSuccess.current = false
-    setCountdown(null)
     if (isEthConnected) disconnectEth()
     if (isSolConnected) disconnectSolana()
   }
@@ -96,11 +79,6 @@ export default function Web3Login({ onSuccess, onError }: Web3LoginProps) {
               연결 해제
             </button>
           </div>
-          {countdown !== null && (
-            <p className="text-cyan-400 text-sm mt-3 text-center">
-              {countdown}초 후 자동으로 닫힙니다...
-            </p>
-          )}
         </div>
       )}
 

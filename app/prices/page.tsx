@@ -159,7 +159,7 @@ function PricesContent() {
             )}
           </div>
           <p className="text-gray-400">
-            상위 100개 코인 | CoinGecko + Binance WebSocket
+            Binance API를 통해 실시간으로 업데이트됩니다
           </p>
         </div>
 

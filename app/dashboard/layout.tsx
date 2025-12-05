@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
 import {
   LayoutDashboard,
+  Home,
+  Kanban,
   Calendar,
   BarChart3,
   Settings,
@@ -15,9 +17,10 @@ import {
 } from 'lucide-react';
 
 const navigation = [
-  { name: 'Kanban Board', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Calendar', href: '/dashboard/calendar', icon: Calendar },
-  { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+  { name: '홈', href: '/dashboard', icon: Home },
+  { name: '프로젝트 보드', href: '/dashboard/board', icon: Kanban },
+  { name: '캘린더', href: '/dashboard/calendar', icon: Calendar },
+  { name: '분석', href: '/dashboard/analytics', icon: BarChart3 },
 ];
 
 export default function DashboardLayout({

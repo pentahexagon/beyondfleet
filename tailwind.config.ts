@@ -8,6 +8,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        comic: ['var(--font-comic)', 'Comic Neue', 'cursive'],
+        gaegu: ['var(--font-gaegu)', 'Gaegu', 'cursive'],
+      },
       colors: {
         space: {
           900: '#0a0a0f',

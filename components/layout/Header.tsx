@@ -140,18 +140,20 @@ export default function Header() {
             {/* Logo */}
             <Link href="/" className="flex items-center space-x-2">
               <span className="text-2xl">🚀</span>
-              <span className="text-xl font-bold gradient-text">BeyondFleet</span>
+              <span className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent font-comic">
+                BeyondFleet
+              </span>
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
+            <div className="hidden md:flex items-center space-x-6">
               {navLinks
                 .filter((link) => !link.requiresAuth || user || isWalletConnected)
                 .map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`text-gray-300 hover:text-white transition-colors duration-200 text-sm font-medium ${
+                    className={`text-gray-300 hover:text-white transition-colors duration-200 text-sm font-comic ${
                       link.icon ? 'flex items-center gap-1' : ''
                     }`}
                   >
@@ -221,7 +223,7 @@ export default function Header() {
                     <Link
                       key={link.href}
                       href={link.href}
-                      className={`text-gray-300 hover:text-white transition-colors duration-200 text-sm font-medium ${
+                      className={`text-gray-300 hover:text-white transition-colors duration-200 text-sm font-comic ${
                         link.icon ? 'flex items-center gap-1' : ''
                       }`}
                       onClick={() => setIsMobileMenuOpen(false)}

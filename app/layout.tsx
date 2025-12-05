@@ -46,6 +46,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko" className={`${inter.variable} ${spaceGrotesk.variable} ${comicNeue.variable} ${gaegu.variable}`}>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
+      </head>
       <body className="font-sans antialiased min-h-screen flex flex-col">
         <Web3Provider>
           <Header />

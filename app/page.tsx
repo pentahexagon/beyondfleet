@@ -170,27 +170,27 @@ export default function Home() {
         </div>
 
         <div className="relative z-10 max-w-6xl mx-auto px-4 text-center">
-          {/* Main Character - Otty */}
+          {/* Main Character - Otty Video */}
           <div className="mb-8 relative">
             <div className="animate-float">
-              <div className="relative mx-auto w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 group">
-                {/* Glow effect behind character */}
-                <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/40 to-purple-500/40 rounded-full blur-3xl animate-pulse-glow" />
+              <div className="relative mx-auto w-full max-w-lg group">
+                {/* Glow effect behind video */}
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/40 to-purple-500/40 rounded-2xl blur-3xl animate-pulse-glow" />
 
-                {/* Otty Image */}
-                <div className="relative w-full h-full flex items-center justify-center hover:scale-110 transition-transform duration-300">
-                  <Image
-                    src="/images/otty.png"
-                    alt="Otty - BeyondFleet Mascot"
-                    fill
-                    className="object-contain drop-shadow-2xl"
-                    priority
-                  />
-                </div>
+                {/* Otty Video */}
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="relative w-full rounded-2xl shadow-2xl hover:scale-105 transition-transform duration-300"
+                >
+                  <source src="/videos/otty-hero.mp4" type="video/mp4" />
+                </video>
               </div>
             </div>
 
-            {/* Floating elements around character */}
+            {/* Floating elements around video */}
             <div className="absolute top-0 left-1/4 text-4xl animate-bounce" style={{ animationDelay: '0s' }}>⭐</div>
             <div className="absolute top-10 right-1/4 text-5xl animate-bounce" style={{ animationDelay: '0.5s' }}>🚀</div>
             <div className="absolute bottom-10 left-1/3 text-3xl animate-bounce" style={{ animationDelay: '1s' }}>💫</div>

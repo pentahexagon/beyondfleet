@@ -39,20 +39,54 @@ export default function Header() {
   }, [])
 
   const handleLogout = async () => {
-    // Supabase 로그아웃
-    await supabase.auth.signOut()
-    setUser(null)
+    try {
+      // 1. Supabase 로그아웃
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('Supabase signOut error:', error)
+      }
 
-    // 지갑 연결 해제
-    if (isEthConnected) {
-      disconnectEth()
-    }
-    if (isSolConnected) {
-      disconnectSol()
-    }
+      // 2. 로컬 상태 초기화
+      setUser(null)
 
-    // 메인 페이지로 이동
-    router.push('/')
+      // 3. 지갑 연결 해제 (ETH)
+      if (isEthConnected) {
+        try {
+          disconnectEth()
+        } catch (e) {
+          console.error('ETH disconnect error:', e)
+        }
+      }
+
+      // 4. 지갑 연결 해제 (SOL)
+      if (isSolConnected) {
+        try {
+          await disconnectSol()
+        } catch (e) {
+          console.error('SOL disconnect error:', e)
+        }
+      }
+
+      // 5. 로컬 스토리지 정리 (지갑 관련)
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('walletconnect')
+        localStorage.removeItem('wagmi.wallet')
+        localStorage.removeItem('wagmi.connected')
+        localStorage.removeItem('wagmi.account')
+        localStorage.removeItem('walletName')
+      }
+
+      // 6. 메인 페이지로 이동
+      router.push('/')
+
+      // 7. 페이지 새로고침으로 상태 완전 초기화
+      router.refresh()
+    } catch (error) {
+      console.error('Logout error:', error)
+      // 에러가 나도 사용자 상태는 초기화
+      setUser(null)
+      router.push('/')
+    }
   }
 
   const openAuthModal = (tab: 'web2' | 'web3' = 'web2') => {

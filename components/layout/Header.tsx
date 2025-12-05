@@ -40,8 +40,8 @@ export default function Header() {
 
   const handleLogout = async () => {
     try {
-      // 1. Supabase 로그아웃
-      const { error } = await supabase.auth.signOut()
+      // 1. Supabase 로그아웃 (scope: 'global'로 모든 세션 로그아웃)
+      const { error } = await supabase.auth.signOut({ scope: 'global' })
       if (error) {
         console.error('Supabase signOut error:', error)
       }
@@ -67,25 +67,34 @@ export default function Header() {
         }
       }
 
-      // 5. 로컬 스토리지 정리 (지갑 관련)
+      // 5. 로컬 스토리지 정리 (지갑 + Supabase 관련)
       if (typeof window !== 'undefined') {
+        // 지갑 관련
         localStorage.removeItem('walletconnect')
         localStorage.removeItem('wagmi.wallet')
         localStorage.removeItem('wagmi.connected')
         localStorage.removeItem('wagmi.account')
+        localStorage.removeItem('wagmi.store')
         localStorage.removeItem('walletName')
+
+        // Supabase 관련 (sb-로 시작하는 모든 키 삭제)
+        const keysToRemove: string[] = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && (key.startsWith('sb-') || key.startsWith('supabase'))) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key))
       }
 
-      // 6. 메인 페이지로 이동
-      router.push('/')
-
-      // 7. 페이지 새로고침으로 상태 완전 초기화
-      router.refresh()
+      // 6. 강제 페이지 새로고침으로 완전 초기화
+      window.location.href = '/'
     } catch (error) {
       console.error('Logout error:', error)
-      // 에러가 나도 사용자 상태는 초기화
+      // 에러가 나도 강제 새로고침
       setUser(null)
-      router.push('/')
+      window.location.href = '/'
     }
   }
 

@@ -29,6 +29,7 @@ export default function JournalPage() {
   const [publicJournals, setPublicJournals] = useState<PublicJournal[]>([])
   const [loading, setLoading] = useState(true)
   const [myJournalCount, setMyJournalCount] = useState(0)
+  const [error, setError] = useState<string | null>(null)
 
   // Web3 wallet states
   const { address: ethAddress, isConnected: isEthConnected } = useAccount()
@@ -64,19 +65,30 @@ export default function JournalPage() {
 
   async function fetchPublicJournals() {
     setLoading(true)
+    setError(null)
     try {
-      const { data, error } = await supabase
+      const { data, error: queryError } = await supabase
         .from('journal_entries')
         .select('*')
         .eq('is_public', true)
         .order('created_at', { ascending: false })
         .limit(20)
 
-      if (error) throw error
+      if (queryError) {
+        console.error('Supabase query error:', queryError)
+        // 테이블이 없는 경우
+        if (queryError.code === '42P01' || queryError.message?.includes('does not exist')) {
+          setError('데이터베이스 테이블이 아직 생성되지 않았습니다.')
+        } else {
+          setError(`데이터를 불러오는 중 오류가 발생했습니다: ${queryError.message}`)
+        }
+        setPublicJournals([])
+        return
+      }
       setPublicJournals(data || [])
-    } catch (error) {
-      console.error('Error fetching public journals:', error)
-      // 테이블이 없거나 에러 시 빈 배열
+    } catch (err) {
+      console.error('Error fetching public journals:', err)
+      setError('네트워크 오류가 발생했습니다. 다시 시도해주세요.')
       setPublicJournals([])
     } finally {
       setLoading(false)
@@ -241,6 +253,20 @@ export default function JournalPage() {
                   <div className="h-3 bg-purple-500/20 rounded w-2/3" />
                 </div>
               ))}
+            </div>
+          ) : error ? (
+            <div className="glass rounded-2xl p-12 text-center border border-red-500/30">
+              <div className="text-4xl mb-4">⚠️</div>
+              <p className="text-red-400 font-gaegu text-xl mb-2">{error}</p>
+              <p className="text-gray-500 text-sm mb-4">
+                Supabase Studio에서 journal_entries 테이블을 생성해주세요.
+              </p>
+              <button
+                onClick={() => fetchPublicJournals()}
+                className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg transition-colors"
+              >
+                다시 시도
+              </button>
             </div>
           ) : publicJournals.length === 0 ? (
             <div className="glass rounded-2xl p-12 text-center">

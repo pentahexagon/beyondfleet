@@ -140,7 +140,10 @@ export default function Header() {
             {/* Logo */}
             <Link href="/" className="flex items-center space-x-2">
               <span className="text-2xl">🚀</span>
-              <span className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent font-comic">
+              <span
+                className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent"
+                style={{ fontFamily: "'Comic Neue', cursive" }}
+              >
                 BeyondFleet
               </span>
             </Link>
@@ -153,9 +156,10 @@ export default function Header() {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`text-gray-300 hover:text-white transition-colors duration-200 text-sm font-comic ${
+                    className={`text-gray-300 hover:text-white transition-colors duration-200 text-sm ${
                       link.icon ? 'flex items-center gap-1' : ''
                     }`}
+                    style={{ fontFamily: "'Comic Neue', cursive" }}
                   >
                     {link.icon && <span>{link.icon}</span>}
                     {link.label}
@@ -223,9 +227,10 @@ export default function Header() {
                     <Link
                       key={link.href}
                       href={link.href}
-                      className={`text-gray-300 hover:text-white transition-colors duration-200 text-sm font-comic ${
+                      className={`text-gray-300 hover:text-white transition-colors duration-200 text-sm ${
                         link.icon ? 'flex items-center gap-1' : ''
                       }`}
+                      style={{ fontFamily: "'Comic Neue', cursive" }}
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       {link.icon && <span>{link.icon}</span>}

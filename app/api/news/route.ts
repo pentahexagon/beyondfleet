@@ -17,6 +17,20 @@ interface CryptoCompareNews {
   tags?: string
 }
 
+interface FormattedNews {
+  id: string
+  title: string
+  summary: string
+  category: string
+  source: string
+  source_url: string
+  image_url: string
+  published_at: string
+  is_premium: boolean
+  premium_category: string | null
+  required_tier: string | null
+}
+
 // Ad filtering keywords (case-insensitive)
 const AD_KEYWORDS = [
   'sponsored',
@@ -28,6 +42,15 @@ const AD_KEYWORDS = [
   'promo',
   'affiliate',
 ]
+
+// Premium content keywords for auto-detection
+const PREMIUM_KEYWORDS = {
+  institution: ['blackrock', 'fidelity', 'grayscale', 'institutional', 'microstrategy', 'saylor', 'etf filing', 'custody'],
+  whale: ['whale', 'large transfer', 'dormant wallet', 'whale alert', 'billion', 'million transferred'],
+  analysis: ['analysis', 'technical analysis', 'on-chain', 'metrics', 'report'],
+  prediction: ['prediction', 'forecast', 'outlook', 'price target', 'expected'],
+  etf: ['etf', 'exchange-traded', 'spot bitcoin', 'bitcoin etf', 'ethereum etf'],
+}
 
 // Check if news item is an ad
 function isAdContent(item: CryptoCompareNews): boolean {
@@ -94,6 +117,28 @@ function detectCategory(title: string, body: string): string {
   return 'all'
 }
 
+// Detect premium category from content
+function detectPremiumCategory(title: string, body: string): { isPremium: boolean; category: string | null; tier: string | null } {
+  const content = (title + ' ' + body).toLowerCase()
+
+  for (const [category, keywords] of Object.entries(PREMIUM_KEYWORDS)) {
+    for (const keyword of keywords) {
+      if (content.includes(keyword)) {
+        // Determine required tier based on category
+        let tier = 'navigator'
+        if (category === 'analysis') tier = 'commander'
+        else if (category === 'prediction') tier = 'pilot'
+        else if (category === 'whale' || category === 'etf') tier = 'pilot'
+        else if (category === 'institution') tier = 'navigator'
+
+        return { isPremium: true, category, tier }
+      }
+    }
+  }
+
+  return { isPremium: false, category: null, tier: null }
+}
+
 // Simple AI summary generator (keyword extraction based)
 function generateAISummary(body: string, title: string): string {
   // Clean HTML tags
@@ -114,6 +159,8 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const category = searchParams.get('category') || 'all'
   const page = parseInt(searchParams.get('page') || '1')
+  const premiumFilter = searchParams.get('premium_filter') || 'all'
+  const premiumCategory = searchParams.get('premium_category') || 'all'
   const perPage = 12
 
   try {
@@ -137,11 +184,15 @@ export async function GET(request: NextRequest) {
     // Step 1: Filter out ads
     news = news.filter((item: CryptoCompareNews) => !isAdContent(item))
 
-    // Step 2: Detect and assign categories based on content
-    const newsWithCategories = news.map((item: CryptoCompareNews) => ({
-      ...item,
-      detectedCategory: detectCategory(item.title, item.body),
-    }))
+    // Step 2: Detect categories and premium status
+    const newsWithCategories = news.map((item: CryptoCompareNews) => {
+      const premiumInfo = detectPremiumCategory(item.title, item.body)
+      return {
+        ...item,
+        detectedCategory: detectCategory(item.title, item.body),
+        ...premiumInfo,
+      }
+    })
 
     // Step 3: Filter by category if not 'all'
     let filteredNews = newsWithCategories
@@ -151,8 +202,20 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Step 4: Filter by premium status
+    if (premiumFilter === 'free') {
+      filteredNews = filteredNews.filter(item => !item.isPremium)
+    } else if (premiumFilter === 'premium') {
+      filteredNews = filteredNews.filter(item => item.isPremium)
+
+      // Further filter by premium category if specified
+      if (premiumCategory !== 'all') {
+        filteredNews = filteredNews.filter(item => item.category === premiumCategory)
+      }
+    }
+
     // Map to our format
-    const formattedNews = filteredNews.map((item) => ({
+    const formattedNews: FormattedNews[] = filteredNews.map((item) => ({
       id: item.id,
       title: item.title,
       summary: generateAISummary(item.body, item.title),
@@ -161,6 +224,9 @@ export async function GET(request: NextRequest) {
       source_url: item.url,
       image_url: item.imageurl,
       published_at: new Date(item.published_on * 1000).toISOString(),
+      is_premium: item.isPremium,
+      premium_category: item.category,
+      required_tier: item.tier,
     }))
 
     // Paginate

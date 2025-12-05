@@ -161,7 +161,10 @@ export default function MyJournalPage() {
           })
           .eq('id', editingEntry.id)
 
-        if (error) throw error
+        if (error) {
+          console.error('Update error:', error)
+          throw error
+        }
 
         setEntries(prev =>
           prev.map(entry =>
@@ -177,16 +180,35 @@ export default function MyJournalPage() {
           .select()
           .single()
 
-        if (error) throw error
+        if (error) {
+          console.error('Insert error:', error)
+          // Check if table doesn't exist
+          if (error.code === '42P01' || error.message?.includes('does not exist')) {
+            alert('데이터베이스 테이블이 없습니다. 관리자에게 문의하세요.')
+            return
+          }
+          throw error
+        }
         if (data) {
           setEntries(prev => [data, ...prev])
         }
       }
 
       resetForm()
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error saving journal entry:', error)
-      alert('저장 중 오류가 발생했습니다.')
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류'
+      const supabaseError = error as { code?: string; message?: string; details?: string }
+
+      if (supabaseError.code === '42P01') {
+        alert('journal_entries 테이블이 존재하지 않습니다. Supabase에서 테이블을 생성해주세요.')
+      } else if (supabaseError.code === '42501') {
+        alert('권한이 없습니다. RLS 정책을 확인해주세요.')
+      } else if (supabaseError.code === '23503') {
+        alert('외래 키 오류: 유효하지 않은 사용자 ID입니다.')
+      } else {
+        alert(`저장 중 오류가 발생했습니다: ${supabaseError.message || errorMessage}`)
+      }
     }
   }
 

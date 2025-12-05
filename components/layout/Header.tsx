@@ -63,6 +63,7 @@ export default function Header() {
   const navLinks = [
     { href: '/', label: '홈' },
     { href: '/prices', label: '시세' },
+    { href: '/journal', label: '도전일지', requiresAuth: true, icon: '📝' },
     { href: '/news', label: '뉴스' },
     { href: '/nft', label: 'NFT' },
     { href: '/membership', label: '멤버십' },
@@ -101,15 +102,20 @@ export default function Header() {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="text-gray-300 hover:text-white transition-colors duration-200 text-sm font-medium"
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {navLinks
+                .filter((link) => !link.requiresAuth || user || isWalletConnected)
+                .map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`text-gray-300 hover:text-white transition-colors duration-200 text-sm font-medium ${
+                      link.icon ? 'flex items-center gap-1' : ''
+                    }`}
+                  >
+                    {link.icon && <span>{link.icon}</span>}
+                    {link.label}
+                  </Link>
+                ))}
             </div>
 
             {/* Auth Buttons */}
@@ -166,16 +172,21 @@ export default function Header() {
           {isMobileMenuOpen && (
             <div className="md:hidden py-4 border-t border-purple-500/20">
               <div className="flex flex-col space-y-4">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="text-gray-300 hover:text-white transition-colors duration-200 text-sm font-medium"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+                {navLinks
+                  .filter((link) => !link.requiresAuth || user || isWalletConnected)
+                  .map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className={`text-gray-300 hover:text-white transition-colors duration-200 text-sm font-medium ${
+                        link.icon ? 'flex items-center gap-1' : ''
+                      }`}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      {link.icon && <span>{link.icon}</span>}
+                      {link.label}
+                    </Link>
+                  ))}
                 <div className="flex flex-col space-y-2 pt-4 border-t border-purple-500/20">
                   {user || isWalletConnected ? (
                     <>

@@ -92,6 +92,8 @@ export const MEMBERSHIP_TIERS: Record<MembershipTier, MembershipInfo> = {
 }
 
 // User Types
+export type UserRole = 'user' | 'admin'
+
 export interface User {
   id: string
   email: string
@@ -99,6 +101,7 @@ export interface User {
   avatar_url: string | null
   membership_tier: MembershipTier
   vote_power: number
+  role: UserRole
   created_at: string
 }
 

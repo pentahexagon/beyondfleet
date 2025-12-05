@@ -14,6 +14,8 @@ import {
 } from 'recharts'
 import { useBinanceWebSocket, getBinanceSymbol } from '@/lib/hooks/useBinanceWebSocket'
 import { createClient } from '@/lib/supabase/client'
+import { useAccount } from 'wagmi'
+import { useWallet } from '@solana/wallet-adapter-react'
 
 interface CoinData {
   id: string
@@ -60,6 +62,12 @@ export default function CoinDetailPage({ params }: { params: Promise<{ id: strin
   const [priceFlash, setPriceFlash] = useState<'up' | 'down' | null>(null)
   const prevPriceRef = useRef<number | null>(null)
 
+  // Web3 wallet states
+  const { address: ethAddress, isConnected: isEthConnected } = useAccount()
+  const { publicKey: solPublicKey, connected: isSolConnected } = useWallet()
+  const isWalletConnected = isEthConnected || isSolConnected
+  const walletAddress = ethAddress || solPublicKey?.toBase58() || null
+
   // Binance WebSocket for real-time price
   const { prices: binancePrices, isConnected: wsConnected } = useBinanceWebSocket([id])
 
@@ -98,16 +106,16 @@ export default function CoinDetailPage({ params }: { params: Promise<{ id: strin
     prevPriceRef.current = currentPrice
   }, [coin, binancePrices, getRealTimePrice])
 
-  // Check auth and favorites
+  // Check auth and watchlist
   useEffect(() => {
     const checkAuth = async () => {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setUser({ id: user.id })
-        // Check if coin is favorited
+        // Check if coin is in watchlist by user_id
         const { data } = await supabase
-          .from('favorites')
+          .from('watchlist')
           .select('id')
           .eq('user_id', user.id)
           .eq('coin_id', id)
@@ -117,6 +125,23 @@ export default function CoinDetailPage({ params }: { params: Promise<{ id: strin
     }
     checkAuth()
   }, [id])
+
+  // Check watchlist for wallet users
+  useEffect(() => {
+    const checkWalletWatchlist = async () => {
+      if (!walletAddress || user) return
+
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('watchlist')
+        .select('id')
+        .eq('wallet_address', walletAddress.toLowerCase())
+        .eq('coin_id', id)
+        .single()
+      setIsFavorite(!!data)
+    }
+    checkWalletWatchlist()
+  }, [id, walletAddress, user])
 
   // Fetch coin data
   useEffect(() => {
@@ -138,22 +163,47 @@ export default function CoinDetailPage({ params }: { params: Promise<{ id: strin
   }, [id, timeRange])
 
   const toggleFavorite = async () => {
-    if (!user) return
+    if (!coin) return
+    if (!user && !isWalletConnected) {
+      alert('로그인이 필요합니다.')
+      return
+    }
+
     setFavoriteLoading(true)
 
     try {
       const supabase = createClient()
       if (isFavorite) {
-        await supabase
-          .from('favorites')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('coin_id', id)
+        // 삭제
+        let query = supabase.from('watchlist').delete().eq('coin_id', id)
+        if (user) {
+          query = query.eq('user_id', user.id)
+        } else if (walletAddress) {
+          query = query.eq('wallet_address', walletAddress.toLowerCase())
+        }
+        await query
         setIsFavorite(false)
       } else {
-        await supabase
-          .from('favorites')
-          .insert({ user_id: user.id, coin_id: id })
+        // 추가
+        const insertData: {
+          user_id?: string
+          wallet_address?: string
+          coin_id: string
+          coin_name: string
+          coin_symbol: string
+        } = {
+          coin_id: id,
+          coin_name: coin.name,
+          coin_symbol: coin.symbol.toUpperCase()
+        }
+
+        if (user) {
+          insertData.user_id = user.id
+        } else if (walletAddress) {
+          insertData.wallet_address = walletAddress.toLowerCase()
+        }
+
+        await supabase.from('watchlist').insert(insertData)
         setIsFavorite(true)
       }
     } catch (err) {
@@ -282,8 +332,8 @@ export default function CoinDetailPage({ params }: { params: Promise<{ id: strin
 
           {/* Actions */}
           <div className="flex gap-2 flex-wrap">
-            {/* Favorite Button - Only show when logged in */}
-            {user && (
+            {/* Favorite Button - Show when logged in OR wallet connected */}
+            {(user || isWalletConnected) && (
               <button
                 onClick={toggleFavorite}
                 disabled={favoriteLoading}

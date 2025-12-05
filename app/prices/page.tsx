@@ -3,7 +3,12 @@
 import { useState, useEffect, useCallback, Suspense, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
+import { Star } from 'lucide-react'
 import { useBinanceWebSocket, getBinanceSymbol } from '@/lib/hooks/useBinanceWebSocket'
+import { supabase } from '@/lib/supabase/client'
+import { User } from '@supabase/supabase-js'
+import { useAccount } from 'wagmi'
+import { useWallet } from '@solana/wallet-adapter-react'
 
 interface Coin {
   id: string
@@ -34,9 +39,158 @@ function PricesContent() {
   const [totalPages, setTotalPages] = useState(1)
   const [priceFlash, setPriceFlash] = useState<Record<string, 'up' | 'down' | null>>({})
   const prevPricesRef = useRef<Record<string, number>>({})
+  const [user, setUser] = useState<User | null>(null)
+  const [watchlist, setWatchlist] = useState<Set<string>>(new Set())
+
+  // Web3 wallet states
+  const { address: ethAddress, isConnected: isEthConnected } = useAccount()
+  const { publicKey: solPublicKey, connected: isSolConnected } = useWallet()
+  const isWalletConnected = isEthConnected || isSolConnected
+  const walletAddress = ethAddress || solPublicKey?.toBase58() || null
 
   // Binance WebSocket for real-time prices
   const { prices: binancePrices, isConnected: wsConnected } = useBinanceWebSocket(allCoinIds)
+
+  // Fetch user and watchlist
+  useEffect(() => {
+    async function fetchUserAndWatchlist() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        setUser(user)
+
+        // Supabase 유저가 있으면 user_id로 조회
+        if (user) {
+          const { data, error } = await supabase
+            .from('watchlist')
+            .select('coin_id')
+            .eq('user_id', user.id)
+
+          if (!error && data) {
+            setWatchlist(new Set(data.map(item => item.coin_id)))
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching watchlist:', err)
+      }
+    }
+
+    fetchUserAndWatchlist()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user ?? null)
+      if (session?.user) {
+        try {
+          const { data, error } = await supabase
+            .from('watchlist')
+            .select('coin_id')
+            .eq('user_id', session.user.id)
+
+          if (!error && data) {
+            setWatchlist(new Set(data.map(item => item.coin_id)))
+          }
+        } catch (err) {
+          console.error('Error fetching watchlist:', err)
+        }
+      } else {
+        setWatchlist(new Set())
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  // 지갑 연결 시 watchlist 조회
+  useEffect(() => {
+    async function fetchWalletWatchlist() {
+      if (!walletAddress || user) return // 지갑 주소 없거나 Supabase 유저 있으면 스킵
+
+      try {
+        const { data, error } = await supabase
+          .from('watchlist')
+          .select('coin_id')
+          .eq('wallet_address', walletAddress.toLowerCase())
+
+        if (!error && data) {
+          setWatchlist(new Set(data.map(item => item.coin_id)))
+        }
+      } catch (err) {
+        console.error('Error fetching wallet watchlist:', err)
+      }
+    }
+
+    fetchWalletWatchlist()
+  }, [walletAddress, user])
+
+  const toggleWatchlist = async (e: React.MouseEvent, coin: Coin) => {
+    e.stopPropagation()
+
+    // 로그인이 안된 경우
+    if (!user && !isWalletConnected) {
+      alert('로그인이 필요합니다.')
+      return
+    }
+
+    const isInWatchlist = watchlist.has(coin.id)
+
+    try {
+      if (isInWatchlist) {
+        // 삭제
+        let query = supabase.from('watchlist').delete().eq('coin_id', coin.id)
+
+        if (user) {
+          query = query.eq('user_id', user.id)
+        } else if (walletAddress) {
+          query = query.eq('wallet_address', walletAddress.toLowerCase())
+        }
+
+        const { error } = await query
+
+        if (error) {
+          console.error('Delete error:', error)
+          alert('관심 목록에서 제거하는데 실패했습니다.')
+          return
+        }
+
+        setWatchlist(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(coin.id)
+          return newSet
+        })
+      } else {
+        // 추가
+        const insertData: {
+          user_id?: string
+          wallet_address?: string
+          coin_id: string
+          coin_name: string
+          coin_symbol: string
+        } = {
+          coin_id: coin.id,
+          coin_name: coin.name,
+          coin_symbol: coin.symbol.toUpperCase()
+        }
+
+        if (user) {
+          insertData.user_id = user.id
+        } else if (walletAddress) {
+          insertData.wallet_address = walletAddress.toLowerCase()
+        }
+
+        const { error } = await supabase.from('watchlist').insert(insertData)
+
+        if (error) {
+          console.error('Insert error:', error)
+          alert('관심 목록에 추가하는데 실패했습니다. Supabase에서 watchlist 테이블을 먼저 생성해주세요.')
+          return
+        }
+
+        setWatchlist(prev => new Set(prev).add(coin.id))
+      }
+    } catch (err) {
+      console.error('Watchlist toggle error:', err)
+      alert('오류가 발생했습니다.')
+    }
+  }
 
   const fetchCoins = useCallback(async () => {
     setLoading(true)
@@ -217,6 +371,7 @@ function PricesContent() {
               <table className="w-full">
                 <thead className="bg-space-800/50">
                   <tr className="text-left text-gray-400 text-sm">
+                    <th className="px-4 py-4 w-12"></th>
                     <th className="px-4 py-4 w-16">#</th>
                     <th className="px-4 py-4">코인</th>
                     <th className="px-4 py-4 text-right cursor-pointer hover:text-white" onClick={() => handleSort('price')}>
@@ -240,6 +395,21 @@ function PricesContent() {
                       className="hover:bg-purple-500/5 transition-colors cursor-pointer"
                       onClick={() => router.push(`/coin/${coin.id}`)}
                     >
+                      <td className="px-4 py-4">
+                        <button
+                          onClick={(e) => toggleWatchlist(e, coin)}
+                          className={`p-1 rounded-full transition-colors ${
+                            watchlist.has(coin.id)
+                              ? 'text-yellow-400 hover:text-yellow-300'
+                              : 'text-gray-600 hover:text-yellow-400'
+                          }`}
+                        >
+                          <Star
+                            className="w-5 h-5"
+                            fill={watchlist.has(coin.id) ? 'currentColor' : 'none'}
+                          />
+                        </button>
+                      </td>
                       <td className="px-4 py-4 text-gray-500">{coin.market_cap_rank}</td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Inter, Space_Grotesk } from 'next/font/google'
+import { Inter, Space_Grotesk, Comic_Neue, Gaegu } from 'next/font/google'
 import './globals.css'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
@@ -13,6 +13,18 @@ const inter = Inter({
 const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
   variable: '--font-space-grotesk',
+})
+
+const comicNeue = Comic_Neue({
+  weight: ['400', '700'],
+  subsets: ['latin'],
+  variable: '--font-comic',
+})
+
+const gaegu = Gaegu({
+  weight: ['400', '700'],
+  subsets: ['latin'],
+  variable: '--font-gaegu',
 })
 
 export const metadata: Metadata = {
@@ -33,7 +45,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ko" className={`${inter.variable} ${spaceGrotesk.variable}`}>
+    <html lang="ko" className={`${inter.variable} ${spaceGrotesk.variable} ${comicNeue.variable} ${gaegu.variable}`}>
       <body className="font-sans antialiased min-h-screen flex flex-col">
         <Web3Provider>
           <Header />

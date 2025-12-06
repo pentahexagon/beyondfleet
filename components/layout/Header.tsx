@@ -106,6 +106,7 @@ export default function Header() {
   const navLinks = [
     { href: '/', label: '홈' },
     { href: '/prices', label: '시세' },
+    { href: '/cosmic-radar', label: 'Cosmic Radar', icon: '💎', premium: true },
     { href: '/journal', label: '도전일지', requiresAuth: true, icon: '📝' },
     { href: '/news', label: '뉴스' },
     { href: '/nft', label: 'NFT' },

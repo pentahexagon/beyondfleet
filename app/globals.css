@@ -344,3 +344,17 @@ body {
   animation: fade-in 0.8s ease-out forwards;
   opacity: 0;
 }
+
+/* Radar scan animation for Cosmic Radar */
+@keyframes radar-scan {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-radar-scan {
+  animation: radar-scan 3s linear infinite;
+}

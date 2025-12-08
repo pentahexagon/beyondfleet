@@ -13,6 +13,10 @@ interface AuthModalProps {
   defaultTab?: 'web2' | 'web3'
 }
 
+// 로그인 시도 제한을 위한 상수
+const MAX_LOGIN_ATTEMPTS = 5
+const LOCKOUT_DURATION = 5 * 60 * 1000 // 5분
+
 export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: AuthModalProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'web2' | 'web3'>(defaultTab)
@@ -24,6 +28,9 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [resetSent, setResetSent] = useState(false)
+  const [loginAttempts, setLoginAttempts] = useState(0)
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null)
+  const [passwordStrength, setPasswordStrength] = useState<'weak' | 'medium' | 'strong' | null>(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -37,6 +44,34 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
   }, [isOpen])
 
   if (!isOpen) return null
+
+  // 비밀번호 강도 검사
+  const checkPasswordStrength = (pwd: string): 'weak' | 'medium' | 'strong' => {
+    let score = 0
+    if (pwd.length >= 8) score++
+    if (pwd.length >= 12) score++
+    if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) score++
+    if (/[0-9]/.test(pwd)) score++
+    if (/[^a-zA-Z0-9]/.test(pwd)) score++
+
+    if (score <= 2) return 'weak'
+    if (score <= 3) return 'medium'
+    return 'strong'
+  }
+
+  // 비밀번호 변경 시 강도 업데이트
+  const handlePasswordChange = (pwd: string) => {
+    setPassword(pwd)
+    if (mode === 'signup' && pwd.length > 0) {
+      setPasswordStrength(checkPasswordStrength(pwd))
+    } else {
+      setPasswordStrength(null)
+    }
+  }
+
+  // 잠금 상태 확인
+  const isLockedOut = lockoutUntil && Date.now() < lockoutUntil
+  const remainingLockoutTime = lockoutUntil ? Math.ceil((lockoutUntil - Date.now()) / 1000) : 0
 
   // 에러 메시지 한글 변환
   const getErrorMessage = (error: Error | { message?: string; code?: string }) => {
@@ -57,6 +92,23 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
       return '올바른 이메일 형식이 아닙니다.'
     }
     return msg || '오류가 발생했습니다.'
+  }
+
+  // 비밀번호 복잡성 검증
+  const validatePassword = (pwd: string): string | null => {
+    if (pwd.length < 8) {
+      return '비밀번호는 최소 8자 이상이어야 합니다.'
+    }
+    if (!/[a-z]/.test(pwd)) {
+      return '소문자를 포함해야 합니다.'
+    }
+    if (!/[A-Z]/.test(pwd)) {
+      return '대문자를 포함해야 합니다.'
+    }
+    if (!/[0-9]/.test(pwd)) {
+      return '숫자를 포함해야 합니다.'
+    }
+    return null
   }
 
   const handlePasswordReset = async (e: React.FormEvent) => {
@@ -81,6 +133,13 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
   const handleWeb2Submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+
+    // 잠금 상태 확인
+    if (isLockedOut) {
+      setError(`너무 많은 시도가 있었습니다. ${Math.ceil(remainingLockoutTime / 60)}분 후에 다시 시도해주세요.`)
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -89,16 +148,32 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
           email,
           password,
         })
-        if (error) throw error
+        if (error) {
+          // 로그인 실패 시 시도 횟수 증가
+          const newAttempts = loginAttempts + 1
+          setLoginAttempts(newAttempts)
+
+          if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
+            setLockoutUntil(Date.now() + LOCKOUT_DURATION)
+            throw new Error(`로그인 시도 ${MAX_LOGIN_ATTEMPTS}회 초과. 5분 후에 다시 시도해주세요.`)
+          }
+
+          throw error
+        }
         if (data?.user) {
+          // 로그인 성공 시 시도 횟수 초기화
+          setLoginAttempts(0)
+          setLockoutUntil(null)
           onClose()
-          // 강제 새로고침으로 상태 반영
           window.location.reload()
         }
       } else if (mode === 'signup') {
-        if (password.length < 6) {
-          throw new Error('비밀번호는 최소 6자 이상이어야 합니다.')
+        // 비밀번호 복잡성 검증
+        const passwordError = validatePassword(password)
+        if (passwordError) {
+          throw new Error(passwordError)
         }
+
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -271,15 +346,53 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
-                <Input
-                  type="password"
-                  placeholder="비밀번호"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? '처리 중...' : mode === 'login' ? '로그인' : '가입하기'}
+                <div>
+                  <Input
+                    type="password"
+                    placeholder={mode === 'signup' ? '비밀번호 (8자 이상, 대소문자+숫자)' : '비밀번호'}
+                    value={password}
+                    onChange={(e) => handlePasswordChange(e.target.value)}
+                    required
+                  />
+                  {/* 비밀번호 강도 표시 (회원가입 시에만) */}
+                  {mode === 'signup' && passwordStrength && (
+                    <div className="mt-2">
+                      <div className="flex gap-1 mb-1">
+                        <div className={`h-1 flex-1 rounded ${
+                          passwordStrength === 'weak' ? 'bg-red-500' :
+                          passwordStrength === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+                        }`} />
+                        <div className={`h-1 flex-1 rounded ${
+                          passwordStrength === 'medium' || passwordStrength === 'strong' ?
+                          (passwordStrength === 'medium' ? 'bg-yellow-500' : 'bg-green-500') : 'bg-gray-600'
+                        }`} />
+                        <div className={`h-1 flex-1 rounded ${
+                          passwordStrength === 'strong' ? 'bg-green-500' : 'bg-gray-600'
+                        }`} />
+                      </div>
+                      <p className={`text-xs ${
+                        passwordStrength === 'weak' ? 'text-red-400' :
+                        passwordStrength === 'medium' ? 'text-yellow-400' : 'text-green-400'
+                      }`}>
+                        {passwordStrength === 'weak' && '약함 - 더 긴 비밀번호와 특수문자를 추가하세요'}
+                        {passwordStrength === 'medium' && '보통 - 특수문자를 추가하면 더 안전합니다'}
+                        {passwordStrength === 'strong' && '강함 - 안전한 비밀번호입니다!'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 로그인 시도 횟수 경고 */}
+                {mode === 'login' && loginAttempts > 0 && loginAttempts < MAX_LOGIN_ATTEMPTS && (
+                  <p className="text-yellow-400 text-xs text-center">
+                    로그인 시도 {loginAttempts}/{MAX_LOGIN_ATTEMPTS} - {MAX_LOGIN_ATTEMPTS - loginAttempts}회 남음
+                  </p>
+                )}
+
+                <Button type="submit" className="w-full" disabled={loading || isLockedOut}>
+                  {loading ? '처리 중...' :
+                   isLockedOut ? `${Math.ceil(remainingLockoutTime / 60)}분 후 시도 가능` :
+                   mode === 'login' ? '로그인' : '가입하기'}
                 </Button>
               </form>
             )}

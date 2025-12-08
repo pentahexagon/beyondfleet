@@ -5,8 +5,8 @@ import { Connection, PublicKey } from '@solana/web3.js'
 import { createBuyInstruction, formatPrice } from '@/lib/solana/auction-house'
 import { TREASURY_WALLET, SolanaError } from '@/lib/solana/umi'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 const solanaRpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com'
 
 // POST: 구매 트랜잭션 생성 요청

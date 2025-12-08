@@ -185,7 +185,7 @@ export default function Header() {
                       {link.label}
                       <ChevronDown className="w-4 h-4" />
                     </button>
-                    {openDropdown === link.label && (
+                    {openDropdown === link.label && link.dropdown && (
                       <div className="absolute top-full left-0 mt-2 w-32 glass rounded-lg py-2 shadow-xl border border-purple-500/20">
                         {link.dropdown.map((item) => (
                           <Link
@@ -270,7 +270,7 @@ export default function Header() {
             <div className="md:hidden py-4 border-t border-purple-500/20">
               <div className="flex flex-col space-y-4">
                 {navLinks.map((link) => (
-                  'dropdown' in link ? (
+                  'dropdown' in link && link.dropdown ? (
                     // 드롭다운 메뉴 (모바일)
                     <div key={link.label} className="space-y-2">
                       <span className="text-gray-400 text-sm font-comic">{link.label}</span>

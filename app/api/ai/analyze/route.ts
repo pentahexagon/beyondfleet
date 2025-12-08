@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
 // Create Supabase client with service role for server-side operations
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+const supabase = SUPABASE_URL && SUPABASE_SERVICE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+  : null
 
 interface NewsItem {
   title: string
@@ -145,6 +147,13 @@ function extractSentiment(content: string): 'bullish' | 'bearish' | 'neutral' {
 }
 
 export async function POST(request: NextRequest) {
+  if (!supabase) {
+    return NextResponse.json(
+      { error: 'Database not configured' },
+      { status: 503 }
+    )
+  }
+
   try {
     // Verify authorization (admin only or cron secret)
     const authHeader = request.headers.get('authorization')
@@ -280,6 +289,13 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint to fetch reports
 export async function GET(request: NextRequest) {
+  if (!supabase) {
+    return NextResponse.json(
+      { error: 'Database not configured' },
+      { status: 503 }
+    )
+  }
+
   const searchParams = request.nextUrl.searchParams
   const tier = searchParams.get('tier') || 'cadet'
   const date = searchParams.get('date') || new Date().toISOString().split('T')[0]

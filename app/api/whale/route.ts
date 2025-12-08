@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 const WHALE_ALERT_API_KEY = process.env.WHALE_ALERT_API_KEY
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+// supabase 클라이언트는 환경변수가 있을 때만 생성
+const supabase = SUPABASE_URL && SUPABASE_SERVICE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+  : null
 
 interface WhaleTransaction {
   blockchain: string
@@ -138,37 +141,42 @@ export async function GET(request: NextRequest) {
   const significantOnly = searchParams.get('significant') === 'true'
 
   try {
-    // First, try to get from database
-    let query = supabase
-      .from('whale_transactions')
-      .select('*')
-      .order('timestamp', { ascending: false })
-      .limit(limit)
+    let dbTransactions = null
 
-    if (coin) {
-      query = query.eq('coin', coin.toUpperCase())
-    }
+    // First, try to get from database (if supabase is configured)
+    if (supabase) {
+      let query = supabase
+        .from('whale_transactions')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(limit)
 
-    if (significantOnly) {
-      query = query.eq('is_significant', true)
-    }
+      if (coin) {
+        query = query.eq('coin', coin.toUpperCase())
+      }
 
-    const { data: dbTransactions, error } = await query
+      if (significantOnly) {
+        query = query.eq('is_significant', true)
+      }
 
-    if (error) {
-      console.error('Database error:', error)
-    }
+      const { data, error } = await query
+      dbTransactions = data
 
-    // If we have recent data (less than 5 minutes old), return it
-    if (dbTransactions && dbTransactions.length > 0) {
-      const mostRecent = new Date(dbTransactions[0].timestamp)
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+      if (error) {
+        console.error('Database error:', error)
+      }
 
-      if (mostRecent > fiveMinutesAgo) {
-        return NextResponse.json({
-          transactions: dbTransactions,
-          source: 'database',
-        })
+      // If we have recent data (less than 5 minutes old), return it
+      if (dbTransactions && dbTransactions.length > 0) {
+        const mostRecent = new Date(dbTransactions[0].timestamp)
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+
+        if (mostRecent > fiveMinutesAgo) {
+          return NextResponse.json({
+            transactions: dbTransactions,
+            source: 'database',
+          })
+        }
       }
     }
 
@@ -191,8 +199,8 @@ export async function GET(request: NextRequest) {
       is_significant: isSignificant(tx.symbol, tx.amount_usd),
     }))
 
-    // Save to database (upsert to avoid duplicates)
-    if (formattedTransactions.length > 0) {
+    // Save to database (upsert to avoid duplicates) - only if supabase is configured
+    if (supabase && formattedTransactions.length > 0) {
       await supabase
         .from('whale_transactions')
         .upsert(formattedTransactions, { onConflict: 'tx_hash' })
@@ -224,6 +232,13 @@ export async function GET(request: NextRequest) {
 
 // POST - Manually add whale transaction (admin only)
 export async function POST(request: NextRequest) {
+  if (!supabase) {
+    return NextResponse.json(
+      { error: 'Database not configured' },
+      { status: 503 }
+    )
+  }
+
   try {
     const body = await request.json()
 

@@ -61,19 +61,34 @@ export default function MyJournalPage() {
     }
   }
 
+  // 로그인 상태 (Supabase 또는 지갑)
+  const isLoggedIn = !!user || isWalletConnected
+
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      setUser(currentUser)
 
-      if (user) {
-        await fetchUsername(user.id)
-        await fetchEntriesByUser(user.id)
-      } else if (walletAddress) {
+      if (currentUser) {
+        await fetchUsername(currentUser.id)
+        await fetchEntriesByUser(currentUser.id)
+      } else if (isWalletConnected && walletAddress) {
+        // 지갑 사용자의 경우 닉네임 가져오기
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('wallet_address', walletAddress)
+          .single()
+        if (profile?.username) {
+          setUsername(profile.username)
+        } else {
+          setUsername(`${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`)
+        }
         await fetchEntriesByWallet(walletAddress)
       } else {
+        // 지갑도 연결 안 되어 있고 user도 없으면 잠시 대기
+        // (지갑 상태가 아직 로드 중일 수 있음)
         setLoading(false)
-        router.push('/journal')
       }
     }
 
@@ -84,18 +99,11 @@ export default function MyJournalPage() {
       if (session?.user) {
         await fetchUsername(session.user.id)
         await fetchEntriesByUser(session.user.id)
-      } else if (walletAddress) {
-        await fetchEntriesByWallet(walletAddress)
-      } else {
-        setEntries([])
-        setUsername(null)
-        setLoading(false)
-        router.push('/journal')
       }
     })
 
     return () => subscription.unsubscribe()
-  }, [walletAddress, router])
+  }, [isWalletConnected, walletAddress])
 
   async function fetchEntriesByUser(userId: string) {
     setLoading(true)
@@ -334,6 +342,36 @@ export default function MyJournalPage() {
                 <div key={i} className="h-32 bg-purple-500/20 rounded-xl" />
               ))}
             </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // 로그인 안 되어 있으면 안내 메시지 표시
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto">
+          <Link href="/journal" className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8 transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+            <span>도전일지로 돌아가기</span>
+          </Link>
+
+          <div className="glass rounded-2xl p-12 text-center">
+            <div className="text-6xl mb-4">🔒</div>
+            <h2 className="text-2xl font-bold text-white mb-2 font-comic">
+              로그인이 필요합니다
+            </h2>
+            <p className="text-gray-400 mb-6">
+              도전일지를 작성하려면 로그인해주세요.
+            </p>
+            <button
+              onClick={() => router.push('/journal')}
+              className="doge-button font-comic text-white"
+            >
+              도전일지 메인으로
+            </button>
           </div>
         </div>
       </div>

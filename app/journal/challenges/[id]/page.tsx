@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase/client'
-import { ArrowLeft, Heart, Eye, TrendingUp, Calendar, Target, Award } from 'lucide-react'
+import { User } from '@supabase/supabase-js'
+import { ArrowLeft, Heart, Eye, TrendingUp, Calendar, Target, Award, Trash2 } from 'lucide-react'
 
 interface JournalEntry {
   id: string
+  user_id?: string
   author_name: string
   title: string
   content: string
@@ -20,14 +22,29 @@ interface JournalEntry {
   updated_at: string
 }
 
+// 관리자 이메일 목록
+const ADMIN_EMAILS = ['coinkim00@gmail.com']
+
 export default function ChallengeDetailPage() {
   const params = useParams()
   const router = useRouter()
   const [entry, setEntry] = useState<JournalEntry | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [user, setUser] = useState<User | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [isOwner, setIsOwner] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
+    // 사용자 정보 가져오기
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user)
+      if (user?.email && ADMIN_EMAILS.includes(user.email)) {
+        setIsAdmin(true)
+      }
+    })
+
     if (params.id) {
       fetchEntry(params.id as string)
     }
@@ -55,6 +72,12 @@ export default function ChallengeDetailPage() {
 
       setEntry(data)
 
+      // 본인 글인지 확인
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      if (currentUser && data.user_id === currentUser.id) {
+        setIsOwner(true)
+      }
+
       // 조회수 증가
       await supabase
         .from('journal_entries')
@@ -80,6 +103,38 @@ export default function ChallengeDetailPage() {
       currency: 'KRW',
       maximumFractionDigits: 0,
     }).format(amount)
+  }
+
+  // 삭제 가능 여부 (본인 또는 관리자)
+  const canDelete = isOwner || isAdmin
+
+  // 삭제 처리
+  const handleDelete = async () => {
+    if (!entry) return
+
+    const confirmMessage = isAdmin && !isOwner
+      ? '관리자 권한으로 이 도전기를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.'
+      : '정말로 이 도전기를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.'
+
+    if (!confirm(confirmMessage)) return
+
+    setDeleting(true)
+    try {
+      const { error } = await supabase
+        .from('journal_entries')
+        .delete()
+        .eq('id', entry.id)
+
+      if (error) throw error
+
+      alert('도전기가 삭제되었습니다.')
+      router.push('/journal/challenges')
+    } catch (err) {
+      console.error('Delete error:', err)
+      alert('삭제 중 오류가 발생했습니다.')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   if (loading) {
@@ -178,9 +233,26 @@ export default function ChallengeDetailPage() {
               )}
             </div>
 
-            <h1 className="text-3xl font-bold text-white font-comic">
-              {entry.title}
-            </h1>
+            <div className="flex items-center justify-between">
+              <h1 className="text-3xl font-bold text-white font-comic">
+                {entry.title}
+              </h1>
+
+              {/* 삭제 버튼 (본인 또는 관리자만 표시) */}
+              {canDelete && (
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors disabled:opacity-50"
+                  title={isAdmin && !isOwner ? '관리자 권한으로 삭제' : '삭제'}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="text-sm">
+                    {deleting ? '삭제 중...' : isAdmin && !isOwner ? '관리자 삭제' : '삭제'}
+                  </span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Content */}

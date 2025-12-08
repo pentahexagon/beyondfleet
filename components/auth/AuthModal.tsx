@@ -16,13 +16,14 @@ interface AuthModalProps {
 export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: AuthModalProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'web2' | 'web3'>(defaultTab)
-  const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -58,6 +59,25 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
     return msg || '오류가 발생했습니다.'
   }
 
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      })
+      if (error) throw error
+      setResetSent(true)
+    } catch (err) {
+      const errorMsg = err instanceof Error ? getErrorMessage(err) : '오류가 발생했습니다.'
+      setError(errorMsg)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleWeb2Submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -75,7 +95,7 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
           // 강제 새로고침으로 상태 반영
           window.location.reload()
         }
-      } else {
+      } else if (mode === 'signup') {
         if (password.length < 6) {
           throw new Error('비밀번호는 최소 6자 이상이어야 합니다.')
         }
@@ -100,6 +120,24 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
   const handleWeb3Success = () => {
     onClose()
     router.refresh()
+  }
+
+  if (resetSent) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative glass rounded-2xl p-8 max-w-md w-full text-center">
+          <span className="text-5xl mb-4 block">📧</span>
+          <h2 className="text-2xl font-bold text-white mb-4">이메일 전송 완료!</h2>
+          <p className="text-gray-400 mb-6">
+            <span className="text-cyan-400">{email}</span>로<br />
+            비밀번호 재설정 링크를 보냈습니다.<br />
+            이메일을 확인해주세요.
+          </p>
+          <Button onClick={() => { setResetSent(false); setMode('login'); }}>로그인으로 돌아가기</Button>
+        </div>
+      </div>
+    )
   }
 
   if (success) {
@@ -189,36 +227,62 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
               >
                 회원가입
               </button>
+              <span className="text-gray-600">|</span>
+              <button
+                onClick={() => setMode('reset')}
+                className={mode === 'reset' ? 'text-white font-medium' : 'text-gray-400'}
+              >
+                비밀번호 찾기
+              </button>
             </div>
 
-            <form onSubmit={handleWeb2Submit} className="space-y-4">
-              {mode === 'signup' && (
+            {/* Password Reset Form */}
+            {mode === 'reset' ? (
+              <form onSubmit={handlePasswordReset} className="space-y-4">
+                <p className="text-gray-400 text-sm text-center mb-4">
+                  가입한 이메일을 입력하면<br />비밀번호 재설정 링크를 보내드립니다.
+                </p>
                 <Input
-                  type="text"
-                  placeholder="사용자명"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  type="email"
+                  placeholder="이메일"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
-              )}
-              <Input
-                type="email"
-                placeholder="이메일"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-              <Input
-                type="password"
-                placeholder="비밀번호"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? '처리 중...' : mode === 'login' ? '로그인' : '가입하기'}
-              </Button>
-            </form>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? '전송 중...' : '재설정 링크 받기'}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleWeb2Submit} className="space-y-4">
+                {mode === 'signup' && (
+                  <Input
+                    type="text"
+                    placeholder="사용자명"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                  />
+                )}
+                <Input
+                  type="email"
+                  placeholder="이메일"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+                <Input
+                  type="password"
+                  placeholder="비밀번호"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? '처리 중...' : mode === 'login' ? '로그인' : '가입하기'}
+                </Button>
+              </form>
+            )}
 
           </div>
         )}

@@ -29,6 +29,7 @@ export default function MyJournalPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null)
+  const [username, setUsername] = useState<string | null>(null)
 
   // Form states
   const [title, setTitle] = useState('')
@@ -43,12 +44,30 @@ export default function MyJournalPage() {
   const isWalletConnected = isEthConnected || isSolConnected
   const walletAddress = ethAddress || solPublicKey?.toBase58() || null
 
+  // profiles 테이블에서 username 가져오기
+  async function fetchUsername(userId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', userId)
+        .single()
+
+      if (!error && data?.username) {
+        setUsername(data.username)
+      }
+    } catch (error) {
+      console.error('Error fetching username:', error)
+    }
+  }
+
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
 
       if (user) {
+        await fetchUsername(user.id)
         await fetchEntriesByUser(user.id)
       } else if (walletAddress) {
         await fetchEntriesByWallet(walletAddress)
@@ -63,11 +82,13 @@ export default function MyJournalPage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setUser(session?.user ?? null)
       if (session?.user) {
+        await fetchUsername(session.user.id)
         await fetchEntriesByUser(session.user.id)
       } else if (walletAddress) {
         await fetchEntriesByWallet(walletAddress)
       } else {
         setEntries([])
+        setUsername(null)
         setLoading(false)
         router.push('/journal')
       }
@@ -115,17 +136,16 @@ export default function MyJournalPage() {
   }
 
   const getAuthorName = () => {
-    if (user?.email) {
-      if (user.email.includes('@wallet.')) {
-        const addr = user.email.split('@')[0]
-        return `${addr.slice(0, 6)}...${addr.slice(-4)}`
-      }
+    // 1순위: profiles 테이블의 username
+    if (username) {
+      return username
+    }
+    // 2순위: 이메일 앞부분 (지갑 주소 형식이 아닌 경우)
+    if (user?.email && !user.email.includes('@wallet.')) {
       return user.email.split('@')[0]
     }
-    if (walletAddress) {
-      return `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
-    }
-    return '익명'
+    // 3순위: 익명
+    return '익명 도전자'
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

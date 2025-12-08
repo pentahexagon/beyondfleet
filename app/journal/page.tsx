@@ -46,8 +46,8 @@ export default function JournalPage() {
       await fetchPublicJournals()
 
       // Fetch my journal count
-      if (user || walletAddress) {
-        await fetchMyJournalCount(user?.id, walletAddress)
+      if (user) {
+        await fetchMyJournalCount(user.id)
       }
     }
 
@@ -55,8 +55,8 @@ export default function JournalPage() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setUser(session?.user ?? null)
-      if (session?.user || walletAddress) {
-        await fetchMyJournalCount(session?.user?.id, walletAddress)
+      if (session?.user) {
+        await fetchMyJournalCount(session.user.id)
       }
     })
 
@@ -95,19 +95,15 @@ export default function JournalPage() {
     }
   }
 
-  async function fetchMyJournalCount(userId?: string, wallet?: string | null) {
+  async function fetchMyJournalCount(userId?: string) {
+    if (!userId) return
+
     try {
-      let query = supabase.from('journal_entries').select('id', { count: 'exact' })
+      const { count, error } = await supabase
+        .from('journal_entries')
+        .select('id', { count: 'exact' })
+        .eq('user_id', userId)
 
-      if (userId) {
-        query = query.eq('user_id', userId)
-      } else if (wallet) {
-        query = query.eq('wallet_address', wallet.toLowerCase())
-      } else {
-        return
-      }
-
-      const { count, error } = await query
       if (!error && count !== null) {
         setMyJournalCount(count)
       }

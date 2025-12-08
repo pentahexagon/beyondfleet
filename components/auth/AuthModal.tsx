@@ -37,6 +37,27 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
 
   if (!isOpen) return null
 
+  // 에러 메시지 한글 변환
+  const getErrorMessage = (error: Error | { message?: string; code?: string }) => {
+    const msg = error.message || ''
+    if (msg.includes('Invalid login credentials')) {
+      return '이메일 또는 비밀번호가 올바르지 않습니다.'
+    }
+    if (msg.includes('Email not confirmed')) {
+      return '이메일 인증이 필요합니다. 메일함을 확인해주세요.'
+    }
+    if (msg.includes('User already registered')) {
+      return '이미 가입된 이메일입니다.'
+    }
+    if (msg.includes('Password should be')) {
+      return '비밀번호는 최소 6자 이상이어야 합니다.'
+    }
+    if (msg.includes('Invalid email')) {
+      return '올바른 이메일 형식이 아닙니다.'
+    }
+    return msg || '오류가 발생했습니다.'
+  }
+
   const handleWeb2Submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -44,13 +65,16 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
 
     try {
       if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
         if (error) throw error
-        onClose()
-        router.refresh()
+        if (data?.user) {
+          onClose()
+          // 강제 새로고침으로 상태 반영
+          window.location.reload()
+        }
       } else {
         if (password.length < 6) {
           throw new Error('비밀번호는 최소 6자 이상이어야 합니다.')
@@ -66,7 +90,8 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
         setSuccess(true)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '오류가 발생했습니다.')
+      const errorMsg = err instanceof Error ? getErrorMessage(err) : '오류가 발생했습니다.'
+      setError(errorMsg)
     } finally {
       setLoading(false)
     }

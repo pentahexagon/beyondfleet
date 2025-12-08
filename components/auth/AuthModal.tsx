@@ -389,7 +389,7 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
                   </p>
                 )}
 
-                <Button type="submit" className="w-full" disabled={loading || isLockedOut}>
+                <Button type="submit" className="w-full" disabled={loading || !!isLockedOut}>
                   {loading ? '처리 중...' :
                    isLockedOut ? `${Math.ceil(remainingLockoutTime / 60)}분 후 시도 가능` :
                    mode === 'login' ? '로그인' : '가입하기'}

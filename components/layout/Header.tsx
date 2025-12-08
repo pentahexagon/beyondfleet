@@ -1,13 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAccount, useDisconnect } from 'wagmi'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { supabase } from '@/lib/supabase/client'
 import AuthModal from '@/components/auth/AuthModal'
 import Button from '@/components/ui/Button'
+import { ChevronDown } from 'lucide-react'
 
 export default function Header() {
   const router = useRouter()
@@ -15,6 +16,7 @@ export default function Header() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const [authModalTab, setAuthModalTab] = useState<'web2' | 'web3'>('web2')
   const [user, setUser] = useState<{ email?: string; id?: string } | null>(null)
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
 
   // Web3 wallet states
   const { address: ethAddress, isConnected: isEthConnected } = useAccount()
@@ -107,16 +109,29 @@ export default function Header() {
     setIsAuthModalOpen(true)
   }
 
+  // 메뉴 순서: 홈, 시세, 레이더, 도전일지, NFT, 멤버십, 정보, 정착지
   const navLinks = [
     { href: '/', label: '홈' },
     { href: '/prices', label: '시세' },
-    { href: '/cosmic-radar', label: 'Cosmic Radar', icon: '💎', premium: true },
-    { href: '/journal', label: '도전일지', requiresAuth: true, icon: '📝' },
-    { href: '/news', label: '뉴스' },
-    { href: '/nft', label: 'NFT' },
+    { href: '/cosmic-radar', label: '레이더', icon: '💎', premium: true },
+    { href: '/journal', label: '도전일지', icon: '📝' },
+    {
+      label: 'NFT',
+      dropdown: [
+        { href: '/nft/auction', label: '옥션' },
+        { href: '/nft/randombox', label: '랜덤박스' },
+        { href: '/giving', label: '기부' },
+      ]
+    },
     { href: '/membership', label: '멤버십' },
-    { href: '/giving', label: '기부' },
-    { href: '/learn', label: '교육' },
+    {
+      label: '정보',
+      dropdown: [
+        { href: '/news', label: '뉴스' },
+        { href: '/learn', label: '교육' },
+      ]
+    },
+    { href: '/roadmap', label: '정착지', icon: '🗺️' },
   ]
 
   // 표시할 주소/이메일 결정
@@ -155,21 +170,49 @@ export default function Header() {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-6">
-              {navLinks
-                .filter((link) => !link.requiresAuth || user || isWalletConnected)
-                .map((link) => (
+              {navLinks.map((link, index) => (
+                'dropdown' in link ? (
+                  // 드롭다운 메뉴
+                  <div
+                    key={link.label}
+                    className="relative"
+                    onMouseEnter={() => setOpenDropdown(link.label)}
+                    onMouseLeave={() => setOpenDropdown(null)}
+                  >
+                    <button
+                      className="text-gray-300 hover:text-white transition-colors duration-200 text-sm flex items-center gap-1 font-comic"
+                    >
+                      {link.label}
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+                    {openDropdown === link.label && (
+                      <div className="absolute top-full left-0 mt-2 w-32 glass rounded-lg py-2 shadow-xl border border-purple-500/20">
+                        {link.dropdown.map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className="block px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-purple-500/20 transition-colors font-comic"
+                          >
+                            {item.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // 일반 링크
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`text-gray-300 hover:text-white transition-colors duration-200 text-sm ${
+                    className={`text-gray-300 hover:text-white transition-colors duration-200 text-sm font-comic ${
                       link.icon ? 'flex items-center gap-1' : ''
                     }`}
-                    style={{ fontFamily: "'Comic Neue', cursive" }}
                   >
                     {link.icon && <span>{link.icon}</span>}
                     {link.label}
                   </Link>
-                ))}
+                )
+              ))}
             </div>
 
             {/* Auth Buttons */}
@@ -226,22 +269,38 @@ export default function Header() {
           {isMobileMenuOpen && (
             <div className="md:hidden py-4 border-t border-purple-500/20">
               <div className="flex flex-col space-y-4">
-                {navLinks
-                  .filter((link) => !link.requiresAuth || user || isWalletConnected)
-                  .map((link) => (
+                {navLinks.map((link) => (
+                  'dropdown' in link ? (
+                    // 드롭다운 메뉴 (모바일)
+                    <div key={link.label} className="space-y-2">
+                      <span className="text-gray-400 text-sm font-comic">{link.label}</span>
+                      <div className="pl-4 space-y-2">
+                        {link.dropdown.map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className="block text-gray-300 hover:text-white transition-colors duration-200 text-sm font-comic"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            {item.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
                     <Link
                       key={link.href}
                       href={link.href}
-                      className={`text-gray-300 hover:text-white transition-colors duration-200 text-sm ${
+                      className={`text-gray-300 hover:text-white transition-colors duration-200 text-sm font-comic ${
                         link.icon ? 'flex items-center gap-1' : ''
                       }`}
-                      style={{ fontFamily: "'Comic Neue', cursive" }}
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       {link.icon && <span>{link.icon}</span>}
                       {link.label}
                     </Link>
-                  ))}
+                  )
+                ))}
                 <div className="flex flex-col space-y-2 pt-4 border-t border-purple-500/20">
                   {user || isWalletConnected ? (
                     <>

@@ -16,6 +16,7 @@ import { useBinanceWebSocket, getBinanceSymbol } from '@/lib/hooks/useBinanceWeb
 import { createClient } from '@/lib/supabase/client'
 import { useAccount } from 'wagmi'
 import { useWallet } from '@solana/wallet-adapter-react'
+import { sanitizeHTML } from '@/lib/security/sanitize'
 
 interface CoinData {
   id: string
@@ -527,7 +528,7 @@ export default function CoinDetailPage({ params }: { params: Promise<{ id: strin
             <h2 className="text-lg font-bold text-white mb-4">{coin.name} 소개</h2>
             <div
               className="text-gray-400 prose prose-invert max-w-none prose-a:text-cyan-400 text-sm md:text-base"
-              dangerouslySetInnerHTML={{ __html: coin.description.slice(0, 1000) + (coin.description.length > 1000 ? '...' : '') }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHTML(coin.description.slice(0, 1000) + (coin.description.length > 1000 ? '...' : '')) }}
             />
           </div>
         )}

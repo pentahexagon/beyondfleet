@@ -7,6 +7,7 @@ import Image from 'next/image'
 import Button from '@/components/ui/Button'
 import { supabase } from '@/lib/supabase/client'
 import { MembershipTier } from '@/types'
+import { sanitizeHTML } from '@/lib/security/sanitize'
 import {
   ArrowLeft,
   ArrowRight,
@@ -343,7 +344,7 @@ export default function LessonDetailPage() {
         <div className="glass rounded-2xl p-6 md:p-10 mb-8">
           <article
             className="prose prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: `<p class="text-gray-300 leading-relaxed mb-4">${renderMarkdown(lesson.content)}</p>` }}
+            dangerouslySetInnerHTML={{ __html: `<p class="text-gray-300 leading-relaxed mb-4">${sanitizeHTML(renderMarkdown(lesson.content))}</p>` }}
           />
         </div>
 

@@ -40,16 +40,10 @@ export default function Header() {
 
   const handleLogout = async () => {
     try {
-      // 1. Supabase 로그아웃 (scope: 'global'로 모든 세션 로그아웃)
-      const { error } = await supabase.auth.signOut({ scope: 'global' })
-      if (error) {
-        console.error('Supabase signOut error:', error)
-      }
-
-      // 2. 로컬 상태 초기화
+      // 1. 로컬 상태 먼저 초기화
       setUser(null)
 
-      // 3. 지갑 연결 해제 (ETH)
+      // 2. 지갑 연결 해제 (ETH)
       if (isEthConnected) {
         try {
           disconnectEth()
@@ -58,7 +52,7 @@ export default function Header() {
         }
       }
 
-      // 4. 지갑 연결 해제 (SOL)
+      // 3. 지갑 연결 해제 (SOL)
       if (isSolConnected) {
         try {
           await disconnectSol()
@@ -67,7 +61,7 @@ export default function Header() {
         }
       }
 
-      // 5. 로컬 스토리지 정리 (지갑 + Supabase 관련)
+      // 4. 로컬 스토리지 완전 정리 (Supabase signOut 전에 수행)
       if (typeof window !== 'undefined') {
         // 지갑 관련
         localStorage.removeItem('walletconnect')
@@ -86,15 +80,25 @@ export default function Header() {
           }
         }
         keysToRemove.forEach(key => localStorage.removeItem(key))
+
+        // 세션 스토리지도 정리
+        sessionStorage.clear()
       }
 
+      // 5. Supabase 로그아웃 (local scope - 현재 브라우저만)
+      await supabase.auth.signOut({ scope: 'local' })
+
       // 6. 강제 페이지 새로고침으로 완전 초기화
-      window.location.href = '/'
+      window.location.replace('/')
     } catch (error) {
       console.error('Logout error:', error)
-      // 에러가 나도 강제 새로고침
+      // 에러가 나도 스토리지 정리 후 강제 새로고침
+      if (typeof window !== 'undefined') {
+        localStorage.clear()
+        sessionStorage.clear()
+      }
       setUser(null)
-      window.location.href = '/'
+      window.location.replace('/')
     }
   }
 

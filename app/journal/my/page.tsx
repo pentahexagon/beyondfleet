@@ -7,18 +7,16 @@ import { supabase } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import { useAccount } from 'wagmi'
 import { useWallet } from '@solana/wallet-adapter-react'
-import { Plus, Trash2, Edit3, Target, TrendingUp, Calendar, CheckCircle2, Circle, ArrowLeft, Share2, Lock } from 'lucide-react'
+import { Plus, Trash2, Edit3, Target, TrendingUp, CheckCircle2, Circle, ArrowLeft, Share2, Lock } from 'lucide-react'
 
 interface JournalEntry {
   id: string
   user_id?: string
-  wallet_address?: string
   title: string
   content: string
   goal_amount?: number
   current_amount?: number
-  target_date?: string
-  status: 'in_progress' | 'completed' | 'paused'
+  status: 'in_progress' | 'completed' | 'paused' | 'draft'
   is_public: boolean
   created_at: string
   updated_at: string
@@ -37,7 +35,6 @@ export default function MyJournalPage() {
   const [content, setContent] = useState('')
   const [goalAmount, setGoalAmount] = useState('')
   const [currentAmount, setCurrentAmount] = useState('')
-  const [targetDate, setTargetDate] = useState('')
   const [isPublic, setIsPublic] = useState(false)
 
   // Web3 wallet states
@@ -98,12 +95,14 @@ export default function MyJournalPage() {
   }
 
   async function fetchEntriesByWallet(address: string) {
+    // wallet_address 컬럼이 없으므로 author_name으로 조회
+    const shortAddress = `${address.slice(0, 6)}...${address.slice(-4)}`
     setLoading(true)
     try {
       const { data, error } = await supabase
         .from('journal_entries')
         .select('*')
-        .eq('wallet_address', address.toLowerCase())
+        .eq('author_name', shortAddress)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -134,21 +133,18 @@ export default function MyJournalPage() {
     if (!user && !walletAddress) return
     if (!title.trim()) return
 
-    const entryData: Partial<JournalEntry> & { author_name?: string } = {
+    const entryData: Record<string, unknown> = {
       title: title.trim(),
       content: content.trim(),
-      goal_amount: goalAmount ? parseFloat(goalAmount) : undefined,
-      current_amount: currentAmount ? parseFloat(currentAmount) : undefined,
-      target_date: targetDate || undefined,
+      goal_amount: goalAmount ? parseFloat(goalAmount) : null,
+      current_amount: currentAmount ? parseFloat(currentAmount) : null,
       status: 'in_progress',
       is_public: isPublic,
       author_name: getAuthorName(),
     }
 
     if (user) {
-      (entryData as JournalEntry).user_id = user.id
-    } else if (walletAddress) {
-      (entryData as JournalEntry).wallet_address = walletAddress.toLowerCase()
+      entryData.user_id = user.id
     }
 
     try {
@@ -218,7 +214,6 @@ export default function MyJournalPage() {
     setContent(entry.content)
     setGoalAmount(entry.goal_amount?.toString() || '')
     setCurrentAmount(entry.current_amount?.toString() || '')
-    setTargetDate(entry.target_date || '')
     setIsPublic(entry.is_public || false)
     setShowForm(true)
   }
@@ -287,7 +282,6 @@ export default function MyJournalPage() {
     setContent('')
     setGoalAmount('')
     setCurrentAmount('')
-    setTargetDate('')
     setIsPublic(false)
     setEditingEntry(null)
     setShowForm(false)
@@ -422,18 +416,6 @@ export default function MyJournalPage() {
                       className="w-full px-4 py-3 bg-space-800 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    목표 달성일
-                  </label>
-                  <input
-                    type="date"
-                    value={targetDate}
-                    onChange={(e) => setTargetDate(e.target.value)}
-                    className="w-full px-4 py-3 bg-space-800 border border-purple-500/30 rounded-xl text-white focus:outline-none focus:border-cyan-500"
-                  />
                 </div>
 
                 {/* Public Toggle */}
@@ -610,12 +592,6 @@ export default function MyJournalPage() {
 
                   {/* Meta Info */}
                   <div className="flex items-center gap-4 text-sm text-gray-500">
-                    {entry.target_date && (
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        목표일: {new Date(entry.target_date).toLocaleDateString('ko-KR')}
-                      </span>
-                    )}
                     <span>
                       생성: {new Date(entry.created_at).toLocaleDateString('ko-KR')}
                     </span>

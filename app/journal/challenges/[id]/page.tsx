@@ -174,40 +174,19 @@ export default function ChallengeDetailPage() {
     }
   }
 
-  // 좋아요 여부 확인
-  async function checkIfLiked(journalId: string) {
-    const { data: { user } } = await supabase.auth.getUser()
-
+  // 좋아요 여부 확인 (로컬스토리지 사용)
+  function checkIfLiked(journalId: string) {
     try {
-      if (user) {
-        const { data, error } = await supabase
-          .from('journal_likes')
-          .select('id')
-          .eq('journal_id', journalId)
-          .eq('user_id', user.id)
-          .single()
-
-        if (data && !error) {
-          setHasLiked(true)
-        }
-      } else if (walletAddress) {
-        const { data, error } = await supabase
-          .from('journal_likes')
-          .select('id')
-          .eq('journal_id', journalId)
-          .eq('wallet_address', walletAddress)
-          .single()
-
-        if (data && !error) {
-          setHasLiked(true)
-        }
+      const likedPosts = JSON.parse(localStorage.getItem('liked_journals') || '[]')
+      if (likedPosts.includes(journalId)) {
+        setHasLiked(true)
       }
     } catch (err) {
-      // 좋아요 안 했으면 에러 발생 (정상)
+      // 로컬스토리지 오류 무시
     }
   }
 
-  // 좋아요 토글
+  // 좋아요 토글 (간단 버전 - journal_entries의 likes만 업데이트)
   async function handleLike() {
     if (!isLoggedIn) {
       alert('로그인이 필요합니다.')
@@ -215,59 +194,45 @@ export default function ChallengeDetailPage() {
     }
     if (!entry || liking) return
 
-    // 지갑 로그인의 경우 user_id 대신 wallet_address 사용
-    const identifier = user?.id || walletAddress
-
     setLiking(true)
     try {
+      // 로컬스토리지에서 좋아요 목록 가져오기
+      const likedPosts = JSON.parse(localStorage.getItem('liked_journals') || '[]')
+
       if (hasLiked) {
         // 좋아요 취소
-        if (user) {
-          await supabase
-            .from('journal_likes')
-            .delete()
-            .eq('journal_id', entry.id)
-            .eq('user_id', user.id)
-        } else if (walletAddress) {
-          await supabase
-            .from('journal_likes')
-            .delete()
-            .eq('journal_id', entry.id)
-            .eq('wallet_address', walletAddress)
-        }
-
-        await supabase
+        const { error } = await supabase
           .from('journal_entries')
           .update({ likes: Math.max(0, likeCount - 1) })
           .eq('id', entry.id)
+
+        if (error) throw error
+
+        // 로컬스토리지에서 제거
+        const newLikedPosts = likedPosts.filter((id: string) => id !== entry.id)
+        localStorage.setItem('liked_journals', JSON.stringify(newLikedPosts))
 
         setHasLiked(false)
         setLikeCount(prev => Math.max(0, prev - 1))
       } else {
         // 좋아요 추가
-        const likeData: { journal_id: string; user_id?: string; wallet_address?: string } = {
-          journal_id: entry.id
-        }
-        if (user) {
-          likeData.user_id = user.id
-        } else if (walletAddress) {
-          likeData.wallet_address = walletAddress
-        }
-
-        await supabase
-          .from('journal_likes')
-          .insert(likeData)
-
-        await supabase
+        const { error } = await supabase
           .from('journal_entries')
           .update({ likes: likeCount + 1 })
           .eq('id', entry.id)
+
+        if (error) throw error
+
+        // 로컬스토리지에 추가
+        likedPosts.push(entry.id)
+        localStorage.setItem('liked_journals', JSON.stringify(likedPosts))
 
         setHasLiked(true)
         setLikeCount(prev => prev + 1)
       }
     } catch (err) {
       console.error('Like error:', err)
+      alert('좋아요 처리에 실패했습니다.')
     } finally {
       setLiking(false)
     }

@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
+import { useAccount } from 'wagmi'
+import { useWallet } from '@solana/wallet-adapter-react'
 import { ArrowLeft, Heart, Eye, TrendingUp, Calendar, Target, Award, Trash2, MessageCircle, Send } from 'lucide-react'
 
 interface JournalEntry {
@@ -25,7 +27,8 @@ interface JournalEntry {
 interface Comment {
   id: string
   journal_id: string
-  user_id: string
+  user_id?: string
+  wallet_address?: string
   author_name: string
   content: string
   created_at: string
@@ -51,6 +54,15 @@ export default function ChallengeDetailPage() {
   const [newComment, setNewComment] = useState('')
   const [submittingComment, setSubmittingComment] = useState(false)
   const [username, setUsername] = useState<string>('')
+
+  // Web3 wallet states
+  const { address: ethAddress, isConnected: isEthConnected } = useAccount()
+  const { publicKey: solPublicKey, connected: isSolConnected } = useWallet()
+  const isWalletConnected = isEthConnected || isSolConnected
+  const walletAddress = ethAddress || solPublicKey?.toBase58() || null
+
+  // 로그인 상태 (Supabase 또는 지갑)
+  const isLoggedIn = !!user || isWalletConnected
 
   useEffect(() => {
     // 사용자 정보 가져오기
@@ -80,6 +92,27 @@ export default function ChallengeDetailPage() {
       checkIfLiked(params.id as string)
     }
   }, [params.id])
+
+  // 지갑 연결 시 사용자 이름 설정
+  useEffect(() => {
+    if (isWalletConnected && walletAddress && !user) {
+      // 지갑 주소에서 닉네임 가져오기
+      const fetchWalletUsername = async () => {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('wallet_address', walletAddress)
+          .single()
+        if (profile?.username) {
+          setUsername(profile.username)
+        } else {
+          // 지갑 주소 축약형으로 설정
+          setUsername(`${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`)
+        }
+      }
+      fetchWalletUsername()
+    }
+  }, [isWalletConnected, walletAddress, user])
 
   async function fetchEntry(id: string) {
     setLoading(true)
@@ -144,18 +177,30 @@ export default function ChallengeDetailPage() {
   // 좋아요 여부 확인
   async function checkIfLiked(journalId: string) {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
 
     try {
-      const { data, error } = await supabase
-        .from('journal_likes')
-        .select('id')
-        .eq('journal_id', journalId)
-        .eq('user_id', user.id)
-        .single()
+      if (user) {
+        const { data, error } = await supabase
+          .from('journal_likes')
+          .select('id')
+          .eq('journal_id', journalId)
+          .eq('user_id', user.id)
+          .single()
 
-      if (data && !error) {
-        setHasLiked(true)
+        if (data && !error) {
+          setHasLiked(true)
+        }
+      } else if (walletAddress) {
+        const { data, error } = await supabase
+          .from('journal_likes')
+          .select('id')
+          .eq('journal_id', journalId)
+          .eq('wallet_address', walletAddress)
+          .single()
+
+        if (data && !error) {
+          setHasLiked(true)
+        }
       }
     } catch (err) {
       // 좋아요 안 했으면 에러 발생 (정상)
@@ -164,21 +209,32 @@ export default function ChallengeDetailPage() {
 
   // 좋아요 토글
   async function handleLike() {
-    if (!user) {
+    if (!isLoggedIn) {
       alert('로그인이 필요합니다.')
       return
     }
     if (!entry || liking) return
 
+    // 지갑 로그인의 경우 user_id 대신 wallet_address 사용
+    const identifier = user?.id || walletAddress
+
     setLiking(true)
     try {
       if (hasLiked) {
         // 좋아요 취소
-        await supabase
-          .from('journal_likes')
-          .delete()
-          .eq('journal_id', entry.id)
-          .eq('user_id', user.id)
+        if (user) {
+          await supabase
+            .from('journal_likes')
+            .delete()
+            .eq('journal_id', entry.id)
+            .eq('user_id', user.id)
+        } else if (walletAddress) {
+          await supabase
+            .from('journal_likes')
+            .delete()
+            .eq('journal_id', entry.id)
+            .eq('wallet_address', walletAddress)
+        }
 
         await supabase
           .from('journal_entries')
@@ -189,12 +245,18 @@ export default function ChallengeDetailPage() {
         setLikeCount(prev => Math.max(0, prev - 1))
       } else {
         // 좋아요 추가
+        const likeData: { journal_id: string; user_id?: string; wallet_address?: string } = {
+          journal_id: entry.id
+        }
+        if (user) {
+          likeData.user_id = user.id
+        } else if (walletAddress) {
+          likeData.wallet_address = walletAddress
+        }
+
         await supabase
           .from('journal_likes')
-          .insert({
-            journal_id: entry.id,
-            user_id: user.id
-          })
+          .insert(likeData)
 
         await supabase
           .from('journal_entries')
@@ -214,7 +276,7 @@ export default function ChallengeDetailPage() {
   // 댓글 작성
   async function handleSubmitComment(e: React.FormEvent) {
     e.preventDefault()
-    if (!user) {
+    if (!isLoggedIn) {
       alert('로그인이 필요합니다.')
       return
     }
@@ -222,14 +284,27 @@ export default function ChallengeDetailPage() {
 
     setSubmittingComment(true)
     try {
+      const commentData: {
+        journal_id: string
+        author_name: string
+        content: string
+        user_id?: string
+        wallet_address?: string
+      } = {
+        journal_id: entry.id,
+        author_name: username || '익명',
+        content: newComment.trim()
+      }
+
+      if (user) {
+        commentData.user_id = user.id
+      } else if (walletAddress) {
+        commentData.wallet_address = walletAddress
+      }
+
       const { data, error } = await supabase
         .from('journal_comments')
-        .insert({
-          journal_id: entry.id,
-          user_id: user.id,
-          author_name: username || user.email?.split('@')[0] || '익명',
-          content: newComment.trim()
-        })
+        .insert(commentData)
         .select()
         .single()
 
@@ -247,9 +322,7 @@ export default function ChallengeDetailPage() {
 
   // 댓글 삭제
   async function handleDeleteComment(commentId: string, commentUserId: string) {
-    if (!user) return
-    // 본인 댓글이거나 관리자만 삭제 가능
-    if (user.id !== commentUserId && !isAdmin) return
+    if (!isLoggedIn) return
 
     if (!confirm('댓글을 삭제하시겠습니까?')) return
 
@@ -522,7 +595,7 @@ export default function ChallengeDetailPage() {
           </h3>
 
           {/* Comment Input */}
-          {user ? (
+          {isLoggedIn ? (
             <form onSubmit={handleSubmitComment} className="mb-6">
               <div className="flex gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
@@ -579,9 +652,12 @@ export default function ChallengeDetailPage() {
                         })}
                       </span>
                       {/* 삭제 버튼 (본인 또는 관리자) */}
-                      {user && (user.id === comment.user_id || isAdmin) && (
+                      {isLoggedIn && (
+                        (user && (user.id === comment.user_id || isAdmin)) ||
+                        (walletAddress && walletAddress === comment.wallet_address)
+                      ) && (
                         <button
-                          onClick={() => handleDeleteComment(comment.id, comment.user_id)}
+                          onClick={() => handleDeleteComment(comment.id, comment.user_id || '')}
                           className="ml-auto text-gray-500 hover:text-red-400 text-xs transition-colors"
                         >
                           삭제

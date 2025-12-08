@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
-import { ArrowLeft, Heart, Eye, TrendingUp, Calendar, Target, Award, Trash2 } from 'lucide-react'
+import { ArrowLeft, Heart, Eye, TrendingUp, Calendar, Target, Award, Trash2, MessageCircle, Send } from 'lucide-react'
 
 interface JournalEntry {
   id: string
@@ -22,6 +22,15 @@ interface JournalEntry {
   updated_at: string
 }
 
+interface Comment {
+  id: string
+  journal_id: string
+  user_id: string
+  author_name: string
+  content: string
+  created_at: string
+}
+
 // 관리자 이메일 목록
 const ADMIN_EMAILS = ['coinkim00@gmail.com']
 
@@ -35,18 +44,40 @@ export default function ChallengeDetailPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [isOwner, setIsOwner] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [hasLiked, setHasLiked] = useState(false)
+  const [likeCount, setLikeCount] = useState(0)
+  const [liking, setLiking] = useState(false)
+  const [comments, setComments] = useState<Comment[]>([])
+  const [newComment, setNewComment] = useState('')
+  const [submittingComment, setSubmittingComment] = useState(false)
+  const [username, setUsername] = useState<string>('')
 
   useEffect(() => {
     // 사용자 정보 가져오기
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       setUser(user)
       if (user?.email && ADMIN_EMAILS.includes(user.email)) {
         setIsAdmin(true)
+      }
+      // 사용자 이름 가져오기
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .single()
+        if (profile?.username) {
+          setUsername(profile.username)
+        } else {
+          setUsername(user.email?.split('@')[0] || '익명')
+        }
       }
     })
 
     if (params.id) {
       fetchEntry(params.id as string)
+      fetchComments(params.id as string)
+      checkIfLiked(params.id as string)
     }
   }, [params.id])
 
@@ -71,6 +102,7 @@ export default function ChallengeDetailPage() {
       }
 
       setEntry(data)
+      setLikeCount(data.likes || 0)
 
       // 본인 글인지 확인
       const { data: { user: currentUser } } = await supabase.auth.getUser()
@@ -89,6 +121,150 @@ export default function ChallengeDetailPage() {
       setError('네트워크 오류가 발생했습니다.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // 댓글 목록 가져오기
+  async function fetchComments(journalId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('journal_comments')
+        .select('*')
+        .eq('journal_id', journalId)
+        .order('created_at', { ascending: true })
+
+      if (!error && data) {
+        setComments(data)
+      }
+    } catch (err) {
+      console.error('Error fetching comments:', err)
+    }
+  }
+
+  // 좋아요 여부 확인
+  async function checkIfLiked(journalId: string) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    try {
+      const { data, error } = await supabase
+        .from('journal_likes')
+        .select('id')
+        .eq('journal_id', journalId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (data && !error) {
+        setHasLiked(true)
+      }
+    } catch (err) {
+      // 좋아요 안 했으면 에러 발생 (정상)
+    }
+  }
+
+  // 좋아요 토글
+  async function handleLike() {
+    if (!user) {
+      alert('로그인이 필요합니다.')
+      return
+    }
+    if (!entry || liking) return
+
+    setLiking(true)
+    try {
+      if (hasLiked) {
+        // 좋아요 취소
+        await supabase
+          .from('journal_likes')
+          .delete()
+          .eq('journal_id', entry.id)
+          .eq('user_id', user.id)
+
+        await supabase
+          .from('journal_entries')
+          .update({ likes: Math.max(0, likeCount - 1) })
+          .eq('id', entry.id)
+
+        setHasLiked(false)
+        setLikeCount(prev => Math.max(0, prev - 1))
+      } else {
+        // 좋아요 추가
+        await supabase
+          .from('journal_likes')
+          .insert({
+            journal_id: entry.id,
+            user_id: user.id
+          })
+
+        await supabase
+          .from('journal_entries')
+          .update({ likes: likeCount + 1 })
+          .eq('id', entry.id)
+
+        setHasLiked(true)
+        setLikeCount(prev => prev + 1)
+      }
+    } catch (err) {
+      console.error('Like error:', err)
+    } finally {
+      setLiking(false)
+    }
+  }
+
+  // 댓글 작성
+  async function handleSubmitComment(e: React.FormEvent) {
+    e.preventDefault()
+    if (!user) {
+      alert('로그인이 필요합니다.')
+      return
+    }
+    if (!entry || !newComment.trim() || submittingComment) return
+
+    setSubmittingComment(true)
+    try {
+      const { data, error } = await supabase
+        .from('journal_comments')
+        .insert({
+          journal_id: entry.id,
+          user_id: user.id,
+          author_name: username || user.email?.split('@')[0] || '익명',
+          content: newComment.trim()
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setComments(prev => [...prev, data])
+      setNewComment('')
+    } catch (err) {
+      console.error('Comment error:', err)
+      alert('댓글 작성에 실패했습니다.')
+    } finally {
+      setSubmittingComment(false)
+    }
+  }
+
+  // 댓글 삭제
+  async function handleDeleteComment(commentId: string, commentUserId: string) {
+    if (!user) return
+    // 본인 댓글이거나 관리자만 삭제 가능
+    if (user.id !== commentUserId && !isAdmin) return
+
+    if (!confirm('댓글을 삭제하시겠습니까?')) return
+
+    try {
+      const { error } = await supabase
+        .from('journal_comments')
+        .delete()
+        .eq('id', commentId)
+
+      if (error) throw error
+
+      setComments(prev => prev.filter(c => c.id !== commentId))
+    } catch (err) {
+      console.error('Delete comment error:', err)
+      alert('댓글 삭제에 실패했습니다.')
     }
   }
 
@@ -312,11 +488,23 @@ export default function ChallengeDetailPage() {
               </div>
             </div>
 
-            {/* Stats */}
+            {/* Stats & Like Button */}
             <div className="flex items-center gap-6 pt-6 border-t border-purple-500/20">
+              <button
+                onClick={handleLike}
+                disabled={liking}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
+                  hasLiked
+                    ? 'bg-pink-500/20 text-pink-400 hover:bg-pink-500/30'
+                    : 'bg-space-800 text-gray-400 hover:text-pink-400 hover:bg-pink-500/10'
+                } disabled:opacity-50`}
+              >
+                <Heart className={`w-5 h-5 ${hasLiked ? 'fill-current' : ''}`} />
+                <span>{likeCount} 좋아요</span>
+              </button>
               <div className="flex items-center gap-2 text-gray-400">
-                <Heart className="w-5 h-5" />
-                <span>{entry.likes || 0} 좋아요</span>
+                <MessageCircle className="w-5 h-5" />
+                <span>{comments.length} 댓글</span>
               </div>
               <div className="flex items-center gap-2 text-gray-400">
                 <Eye className="w-5 h-5" />
@@ -324,6 +512,88 @@ export default function ChallengeDetailPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Comments Section */}
+        <div className="mt-8 glass rounded-2xl p-6">
+          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+            <MessageCircle className="w-5 h-5 text-cyan-400" />
+            응원 댓글 ({comments.length})
+          </h3>
+
+          {/* Comment Input */}
+          {user ? (
+            <form onSubmit={handleSubmitComment} className="mb-6">
+              <div className="flex gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
+                  {username?.[0] || '?'}
+                </div>
+                <div className="flex-1 flex gap-2">
+                  <input
+                    type="text"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="응원 메시지를 남겨주세요! 💪"
+                    className="flex-1 bg-space-800 border border-purple-500/20 rounded-full px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50"
+                    maxLength={200}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!newComment.trim() || submittingComment}
+                    className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full text-white font-bold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span className="hidden sm:inline">{submittingComment ? '전송 중...' : '응원'}</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          ) : (
+            <div className="mb-6 p-4 bg-space-800/50 rounded-xl text-center text-gray-400">
+              로그인하면 응원 댓글을 남길 수 있어요! 🚀
+            </div>
+          )}
+
+          {/* Comments List */}
+          {comments.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p className="text-4xl mb-2">💬</p>
+              <p>아직 댓글이 없어요. 첫 응원을 남겨주세요!</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {comments.map((comment) => (
+                <div key={comment.id} className="flex gap-3 p-4 bg-space-800/30 rounded-xl">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
+                    {comment.author_name?.[0] || '?'}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-white font-bold">{comment.author_name}</span>
+                      <span className="text-gray-500 text-xs">
+                        {new Date(comment.created_at).toLocaleDateString('ko-KR', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                      {/* 삭제 버튼 (본인 또는 관리자) */}
+                      {user && (user.id === comment.user_id || isAdmin) && (
+                        <button
+                          onClick={() => handleDeleteComment(comment.id, comment.user_id)}
+                          className="ml-auto text-gray-500 hover:text-red-400 text-xs transition-colors"
+                        >
+                          삭제
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-gray-300">{comment.content}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Encouragement Banner */}

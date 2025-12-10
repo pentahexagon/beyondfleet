@@ -169,33 +169,35 @@ export default function Header() {
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-6">
+            <div className="hidden md:flex items-center space-x-4">
               {navLinks.map((link, index) => (
                 'dropdown' in link ? (
                   // 드롭다운 메뉴
                   <div
                     key={link.label}
-                    className="relative"
+                    className="relative group"
                     onMouseEnter={() => setOpenDropdown(link.label)}
                     onMouseLeave={() => setOpenDropdown(null)}
                   >
                     <button
-                      className="text-gray-300 hover:text-white transition-colors duration-200 text-sm flex items-center gap-1 font-comic"
+                      className="px-3 py-2 text-gray-300 hover:text-white hover:bg-purple-500/10 rounded-lg transition-all duration-200 text-sm flex items-center gap-1 font-comic"
                     >
                       {link.label}
-                      <ChevronDown className="w-4 h-4" />
+                      <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${openDropdown === link.label ? 'rotate-180' : ''}`} />
                     </button>
                     {openDropdown === link.label && link.dropdown && (
-                      <div className="absolute top-full left-0 mt-2 w-32 glass rounded-lg py-2 shadow-xl border border-purple-500/20">
-                        {link.dropdown.map((item) => (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            className="block px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-purple-500/20 transition-colors font-comic"
-                          >
-                            {item.label}
-                          </Link>
-                        ))}
+                      <div className="absolute top-full left-0 pt-1">
+                        <div className="w-36 glass rounded-xl py-2 shadow-2xl border border-purple-500/30 backdrop-blur-xl">
+                          {link.dropdown.map((item) => (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              className="block px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-gradient-to-r hover:from-purple-500/20 hover:to-cyan-500/20 transition-all font-comic"
+                            >
+                              {item.label}
+                            </Link>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -204,7 +206,7 @@ export default function Header() {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`text-gray-300 hover:text-white transition-colors duration-200 text-sm font-comic ${
+                    className={`px-3 py-2 text-gray-300 hover:text-white hover:bg-purple-500/10 rounded-lg transition-all duration-200 text-sm font-comic ${
                       link.icon ? 'flex items-center gap-1' : ''
                     }`}
                   >

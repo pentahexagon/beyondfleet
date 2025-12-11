@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
-// Create Supabase client with service role for server-side operations
-const supabase = SUPABASE_URL && SUPABASE_SERVICE_KEY
-  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-  : null
+// Create Supabase client lazily to avoid build-time errors
+function getSupabase(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return null
+  return createClient(url, key)
+}
 
 interface NewsItem {
   title: string
@@ -147,6 +148,7 @@ function extractSentiment(content: string): 'bullish' | 'bearish' | 'neutral' {
 }
 
 export async function POST(request: NextRequest) {
+  const supabase = getSupabase()
   if (!supabase) {
     return NextResponse.json(
       { error: 'Database not configured' },
@@ -289,6 +291,7 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint to fetch reports
 export async function GET(request: NextRequest) {
+  const supabase = getSupabase()
   if (!supabase) {
     return NextResponse.json(
       { error: 'Database not configured' },

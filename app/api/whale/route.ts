@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 const WHALE_ALERT_API_KEY = process.env.WHALE_ALERT_API_KEY
 
-// supabase 클라이언트는 환경변수가 있을 때만 생성
-const supabase = SUPABASE_URL && SUPABASE_SERVICE_KEY
-  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-  : null
+// Create Supabase client lazily to avoid build-time errors
+function getSupabase(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return null
+  return createClient(url, key)
+}
 
 interface WhaleTransaction {
   blockchain: string
@@ -139,6 +140,7 @@ export async function GET(request: NextRequest) {
   const coin = searchParams.get('coin')
   const limit = parseInt(searchParams.get('limit') || '20')
   const significantOnly = searchParams.get('significant') === 'true'
+  const supabase = getSupabase()
 
   try {
     let dbTransactions = null
@@ -232,6 +234,7 @@ export async function GET(request: NextRequest) {
 
 // POST - Manually add whale transaction (admin only)
 export async function POST(request: NextRequest) {
+  const supabase = getSupabase()
   if (!supabase) {
     return NextResponse.json(
       { error: 'Database not configured' },

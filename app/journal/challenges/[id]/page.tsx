@@ -277,9 +277,16 @@ export default function ChallengeDetailPage() {
 
       setComments(prev => [...prev, data])
       setNewComment('')
-    } catch (err) {
+    } catch (err: any) {
       console.error('Comment error:', err)
-      alert('댓글 작성에 실패했습니다.')
+      // 테이블이 없는 경우
+      if (err?.code === '42P01' || err?.message?.includes('does not exist')) {
+        alert('댓글 기능이 아직 준비 중입니다. 관리자에게 문의해주세요.')
+      } else if (err?.code === '42501' || err?.message?.includes('permission')) {
+        alert('댓글 작성 권한이 없습니다. 다시 로그인해주세요.')
+      } else {
+        alert('댓글 작성에 실패했습니다. 잠시 후 다시 시도해주세요.')
+      }
     } finally {
       setSubmittingComment(false)
     }

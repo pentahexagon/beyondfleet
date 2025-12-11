@@ -157,8 +157,17 @@ export default function ChallengeDetailPage() {
     }
   }
 
-  // 댓글 목록 가져오기
+  // 댓글 목록 가져오기 (로컬스토리지 + DB 하이브리드)
   async function fetchComments(journalId: string) {
+    // 먼저 로컬스토리지에서 댓글 불러오기
+    try {
+      const localComments = JSON.parse(localStorage.getItem(`comments_${journalId}`) || '[]')
+      setComments(localComments)
+    } catch (err) {
+      console.error('Error loading local comments:', err)
+    }
+
+    // DB에서도 시도 (테이블이 있으면)
     try {
       const { data, error } = await supabase
         .from('journal_comments')
@@ -166,11 +175,12 @@ export default function ChallengeDetailPage() {
         .eq('journal_id', journalId)
         .order('created_at', { ascending: true })
 
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         setComments(data)
       }
     } catch (err) {
-      console.error('Error fetching comments:', err)
+      // DB 테이블이 없으면 로컬스토리지 댓글만 사용
+      console.log('Using local comments only')
     }
   }
 
@@ -238,7 +248,7 @@ export default function ChallengeDetailPage() {
     }
   }
 
-  // 댓글 작성
+  // 댓글 작성 (로컬스토리지 + DB 하이브리드)
   async function handleSubmitComment(e: React.FormEvent) {
     e.preventDefault()
     if (!isLoggedIn) {
@@ -248,69 +258,83 @@ export default function ChallengeDetailPage() {
     if (!entry || !newComment.trim() || submittingComment) return
 
     setSubmittingComment(true)
+
+    const newCommentData: Comment = {
+      id: crypto.randomUUID(),
+      journal_id: entry.id,
+      user_id: user?.id,
+      wallet_address: walletAddress || undefined,
+      author_name: username || '익명',
+      content: newComment.trim(),
+      created_at: new Date().toISOString()
+    }
+
     try {
-      const commentData: {
-        journal_id: string
-        author_name: string
-        content: string
-        user_id?: string
-        wallet_address?: string
-      } = {
-        journal_id: entry.id,
-        author_name: username || '익명',
-        content: newComment.trim()
-      }
-
-      if (user) {
-        commentData.user_id = user.id
-      } else if (walletAddress) {
-        commentData.wallet_address = walletAddress
-      }
-
+      // 먼저 DB에 저장 시도
       const { data, error } = await supabase
         .from('journal_comments')
-        .insert(commentData)
+        .insert({
+          journal_id: entry.id,
+          author_name: username || '익명',
+          content: newComment.trim(),
+          user_id: user?.id || null,
+          wallet_address: walletAddress || null
+        })
         .select()
         .single()
 
-      if (error) throw error
-
-      setComments(prev => [...prev, data])
-      setNewComment('')
-    } catch (err: any) {
-      console.error('Comment error:', err)
-      // 테이블이 없는 경우
-      if (err?.code === '42P01' || err?.message?.includes('does not exist')) {
-        alert('댓글 기능이 아직 준비 중입니다. 관리자에게 문의해주세요.')
-      } else if (err?.code === '42501' || err?.message?.includes('permission')) {
-        alert('댓글 작성 권한이 없습니다. 다시 로그인해주세요.')
-      } else {
-        alert('댓글 작성에 실패했습니다. 잠시 후 다시 시도해주세요.')
+      if (!error && data) {
+        setComments(prev => [...prev, data])
+        setNewComment('')
+        return
       }
+    } catch (err) {
+      console.log('DB save failed, using localStorage')
+    }
+
+    // DB 실패 시 로컬스토리지에 저장
+    try {
+      const localComments = JSON.parse(localStorage.getItem(`comments_${entry.id}`) || '[]')
+      localComments.push(newCommentData)
+      localStorage.setItem(`comments_${entry.id}`, JSON.stringify(localComments))
+      setComments(prev => [...prev, newCommentData])
+      setNewComment('')
+    } catch (err) {
+      console.error('LocalStorage error:', err)
+      alert('댓글 저장에 실패했습니다.')
     } finally {
       setSubmittingComment(false)
     }
   }
 
-  // 댓글 삭제
+  // 댓글 삭제 (로컬스토리지 + DB 하이브리드)
   async function handleDeleteComment(commentId: string, commentUserId: string) {
     if (!isLoggedIn) return
+    if (!entry) return
 
     if (!confirm('댓글을 삭제하시겠습니까?')) return
 
+    // DB에서 삭제 시도
     try {
-      const { error } = await supabase
+      await supabase
         .from('journal_comments')
         .delete()
         .eq('id', commentId)
-
-      if (error) throw error
-
-      setComments(prev => prev.filter(c => c.id !== commentId))
     } catch (err) {
-      console.error('Delete comment error:', err)
-      alert('댓글 삭제에 실패했습니다.')
+      console.log('DB delete failed')
     }
+
+    // 로컬스토리지에서도 삭제
+    try {
+      const localComments = JSON.parse(localStorage.getItem(`comments_${entry.id}`) || '[]')
+      const filtered = localComments.filter((c: Comment) => c.id !== commentId)
+      localStorage.setItem(`comments_${entry.id}`, JSON.stringify(filtered))
+    } catch (err) {
+      console.log('LocalStorage delete failed')
+    }
+
+    // UI에서 제거
+    setComments(prev => prev.filter(c => c.id !== commentId))
   }
 
   const calculateProgress = (current?: number, goal?: number) => {

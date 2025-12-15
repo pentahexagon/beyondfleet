@@ -442,21 +442,18 @@ export default function ChallengeDetailPage() {
         </Link>
 
         {/* Main Card */}
-        <div className={`glass rounded-3xl overflow-hidden border ${
-          isCompleted ? 'border-green-500/30' : 'border-purple-500/20'
-        }`}>
+        <div className={`glass rounded-3xl overflow-hidden border ${isCompleted ? 'border-green-500/30' : 'border-purple-500/20'
+          }`}>
           {/* Header */}
-          <div className={`p-6 ${
-            isCompleted
+          <div className={`p-6 ${isCompleted
               ? 'bg-gradient-to-r from-green-500/10 to-emerald-500/10'
               : 'bg-gradient-to-r from-purple-500/10 to-pink-500/10'
-          }`}>
+            }`}>
             <div className="flex items-center gap-4 mb-4">
-              <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl font-bold ${
-                isCompleted
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl font-bold ${isCompleted
                   ? 'bg-gradient-to-br from-green-500 to-emerald-600'
                   : 'bg-gradient-to-br from-purple-500 to-pink-500'
-              }`}>
+                }`}>
                 {entry.author_name?.[0] || '?'}
               </div>
               <div className="flex-1">
@@ -519,11 +516,10 @@ export default function ChallengeDetailPage() {
                   </div>
                   <div className="h-4 bg-space-900 rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        isCompleted
+                      className={`h-full rounded-full transition-all duration-500 ${isCompleted
                           ? 'bg-gradient-to-r from-green-500 to-emerald-400'
                           : 'bg-gradient-to-r from-purple-500 to-pink-500'
-                      }`}
+                        }`}
                       style={{ width: `${progress}%` }}
                     />
                   </div>
@@ -562,11 +558,10 @@ export default function ChallengeDetailPage() {
               <button
                 onClick={handleLike}
                 disabled={liking}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
-                  hasLiked
+                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${hasLiked
                     ? 'bg-pink-500/20 text-pink-400 hover:bg-pink-500/30'
                     : 'bg-space-800 text-gray-400 hover:text-pink-400 hover:bg-pink-500/10'
-                } disabled:opacity-50`}
+                  } disabled:opacity-50`}
               >
                 <Heart className={`w-5 h-5 ${hasLiked ? 'fill-current' : ''}`} />
                 <span>{likeCount} 좋아요</span>
@@ -650,15 +645,18 @@ export default function ChallengeDetailPage() {
                       {/* 삭제 버튼 (본인 또는 관리자) */}
                       {isLoggedIn && (
                         (user && (user.id === comment.user_id || isAdmin)) ||
-                        (walletAddress && walletAddress === comment.wallet_address)
+                        (walletAddress && comment.wallet_address &&
+                          walletAddress.toLowerCase() === comment.wallet_address.toLowerCase())
                       ) && (
-                        <button
-                          onClick={() => handleDeleteComment(comment.id, comment.user_id || '')}
-                          className="ml-auto text-gray-500 hover:text-red-400 text-xs transition-colors"
-                        >
-                          삭제
-                        </button>
-                      )}
+                          <button
+                            onClick={() => handleDeleteComment(comment.id, comment.user_id || '')}
+                            className="ml-auto flex items-center gap-1 px-2 py-1 text-xs text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors"
+                            title="삭제"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>삭제</span>
+                          </button>
+                        )}
                     </div>
                     <p className="text-gray-300">{comment.content}</p>
                   </div>

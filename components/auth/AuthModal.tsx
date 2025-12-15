@@ -257,21 +257,19 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
         <div className="flex rounded-lg bg-space-800/50 p-1 mb-6">
           <button
             onClick={() => setActiveTab('web2')}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-              activeTab === 'web2'
-                ? 'bg-gradient-to-r from-purple-600 to-cyan-500 text-white'
-                : 'text-gray-400 hover:text-white'
-            }`}
+            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${activeTab === 'web2'
+              ? 'bg-gradient-to-r from-purple-600 to-cyan-500 text-white'
+              : 'text-gray-400 hover:text-white'
+              }`}
           >
             이메일 로그인
           </button>
           <button
             onClick={() => setActiveTab('web3')}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-              activeTab === 'web3'
-                ? 'bg-gradient-to-r from-purple-600 to-cyan-500 text-white'
-                : 'text-gray-400 hover:text-white'
-            }`}
+            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${activeTab === 'web3'
+              ? 'bg-gradient-to-r from-purple-600 to-cyan-500 text-white'
+              : 'text-gray-400 hover:text-white'
+              }`}
           >
             지갑 연결
           </button>
@@ -358,22 +356,18 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
                   {mode === 'signup' && passwordStrength && (
                     <div className="mt-2">
                       <div className="flex gap-1 mb-1">
-                        <div className={`h-1 flex-1 rounded ${
-                          passwordStrength === 'weak' ? 'bg-red-500' :
+                        <div className={`h-1 flex-1 rounded ${passwordStrength === 'weak' ? 'bg-red-500' :
                           passwordStrength === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                        }`} />
-                        <div className={`h-1 flex-1 rounded ${
-                          passwordStrength === 'medium' || passwordStrength === 'strong' ?
+                          }`} />
+                        <div className={`h-1 flex-1 rounded ${passwordStrength === 'medium' || passwordStrength === 'strong' ?
                           (passwordStrength === 'medium' ? 'bg-yellow-500' : 'bg-green-500') : 'bg-gray-600'
-                        }`} />
-                        <div className={`h-1 flex-1 rounded ${
-                          passwordStrength === 'strong' ? 'bg-green-500' : 'bg-gray-600'
-                        }`} />
+                          }`} />
+                        <div className={`h-1 flex-1 rounded ${passwordStrength === 'strong' ? 'bg-green-500' : 'bg-gray-600'
+                          }`} />
                       </div>
-                      <p className={`text-xs ${
-                        passwordStrength === 'weak' ? 'text-red-400' :
+                      <p className={`text-xs ${passwordStrength === 'weak' ? 'text-red-400' :
                         passwordStrength === 'medium' ? 'text-yellow-400' : 'text-green-400'
-                      }`}>
+                        }`}>
                         {passwordStrength === 'weak' && '약함 - 더 긴 비밀번호와 특수문자를 추가하세요'}
                         {passwordStrength === 'medium' && '보통 - 특수문자를 추가하면 더 안전합니다'}
                         {passwordStrength === 'strong' && '강함 - 안전한 비밀번호입니다!'}
@@ -391,8 +385,8 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
 
                 <Button type="submit" className="w-full" disabled={loading || !!isLockedOut}>
                   {loading ? '처리 중...' :
-                   isLockedOut ? `${Math.ceil(remainingLockoutTime / 60)}분 후 시도 가능` :
-                   mode === 'login' ? '로그인' : '가입하기'}
+                    isLockedOut ? `${Math.ceil(remainingLockoutTime / 60)}분 후 시도 가능` :
+                      mode === 'login' ? '로그인' : '가입하기'}
                 </Button>
               </form>
             )}
@@ -402,7 +396,11 @@ export default function AuthModal({ isOpen, onClose, defaultTab = 'web2' }: Auth
 
         {/* Web3 Tab Content */}
         {activeTab === 'web3' && (
-          <Web3Login onSuccess={handleWeb3Success} onError={setError} />
+          <Web3Login
+            onSuccess={handleWeb3Success}
+            onError={setError}
+            onClose={onClose}
+          />
         )}
 
         {/* Footer */}

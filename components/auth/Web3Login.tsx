@@ -6,13 +6,15 @@ import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { useWalletModal } from '@solana/wallet-adapter-react-ui'
 import Button from '@/components/ui/Button'
+import { PhantomIcon } from '@/components/icons/WalletIcons'
 
 interface Web3LoginProps {
   onSuccess: () => void
   onError: (error: string) => void
+  onClose?: () => void
 }
 
-export default function Web3Login({ onSuccess, onError }: Web3LoginProps) {
+export default function Web3Login({ onSuccess, onError, onClose }: Web3LoginProps) {
   // Ethereum (wagmi + rainbowkit)
   const { address: ethAddress, isConnected: isEthConnected } = useAccount()
   const { openConnectModal } = useConnectModal()
@@ -44,8 +46,13 @@ export default function Web3Login({ onSuccess, onError }: Web3LoginProps) {
 
   // Handle Solana wallet connect
   const handleSolConnect = useCallback(() => {
+    // 1. Solana 모달 띄우기
     setSolanaModalVisible(true)
-  }, [setSolanaModalVisible])
+    // 2. AuthModal 닫기 (Z-index 충돌 방지 및 자연스러운 UX)
+    if (onClose) {
+      setTimeout(() => onClose(), 100)
+    }
+  }, [setSolanaModalVisible, onClose])
 
   // Disconnect all wallets
   const handleDisconnect = () => {
@@ -109,7 +116,7 @@ export default function Web3Login({ onSuccess, onError }: Web3LoginProps) {
               className="w-full justify-start"
               onClick={handleSolConnect}
             >
-              <img src="https://phantom.app/img/phantom-icon-purple.svg" alt="Phantom" className="w-6 h-6 mr-3" />
+              <PhantomIcon className="w-6 h-6 mr-3 rounded-full" />
               Phantom / Solflare
             </Button>
           </div>

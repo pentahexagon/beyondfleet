@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
+export const dynamic = 'force-dynamic'
+
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
 
 // Create Supabase client lazily to avoid build-time errors

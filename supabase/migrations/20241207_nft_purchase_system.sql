@@ -88,7 +88,11 @@ RETURNS TABLE (
   final_price DECIMAL,
   seller_wallet TEXT,
   end_time TIMESTAMP WITH TIME ZONE
-) AS $$
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   RETURN QUERY
   SELECT
@@ -106,13 +110,17 @@ BEGIN
     AND a.highest_bidder IS NOT NULL
   ORDER BY a.end_time ASC;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- ============================================
 -- 6. 스나이핑 방지 트리거 함수
 -- ============================================
 CREATE OR REPLACE FUNCTION check_auction_extension()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
   five_minutes INTERVAL := '5 minutes';
   time_until_end INTERVAL;
@@ -138,7 +146,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- 트리거 생성
 DROP TRIGGER IF EXISTS trigger_auction_extension ON auctions;

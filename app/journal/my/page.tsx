@@ -449,7 +449,8 @@ export default function MyJournalPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  {/* 목표 금액 */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       목표 금액 (원)
@@ -461,7 +462,34 @@ export default function MyJournalPage() {
                       placeholder="10000000"
                       className="w-full px-4 py-3 bg-space-800 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
                     />
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {[
+                        { label: '만', value: 10000 },
+                        { label: '십만', value: 100000 },
+                        { label: '백만', value: 1000000 },
+                        { label: '천만', value: 10000000 },
+                        { label: '억', value: 100000000 },
+                      ].map((btn) => (
+                        <button
+                          key={btn.label}
+                          type="button"
+                          onClick={() => setGoalAmount(prev => String((parseInt(prev) || 0) + btn.value))}
+                          className="px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 text-sm rounded-lg transition-colors border border-purple-500/30"
+                        >
+                          +{btn.label}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setGoalAmount('')}
+                        className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/40 text-red-300 text-sm rounded-lg transition-colors border border-red-500/30"
+                      >
+                        초기화
+                      </button>
+                    </div>
                   </div>
+
+                  {/* 현재 금액 */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       현재 금액 (원)
@@ -473,6 +501,31 @@ export default function MyJournalPage() {
                       placeholder="5000000"
                       className="w-full px-4 py-3 bg-space-800 border border-purple-500/30 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
                     />
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {[
+                        { label: '만', value: 10000 },
+                        { label: '십만', value: 100000 },
+                        { label: '백만', value: 1000000 },
+                        { label: '천만', value: 10000000 },
+                        { label: '억', value: 100000000 },
+                      ].map((btn) => (
+                        <button
+                          key={btn.label}
+                          type="button"
+                          onClick={() => setCurrentAmount(prev => String((parseInt(prev) || 0) + btn.value))}
+                          className="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 text-sm rounded-lg transition-colors border border-cyan-500/30"
+                        >
+                          +{btn.label}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setCurrentAmount('')}
+                        className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/40 text-red-300 text-sm rounded-lg transition-colors border border-red-500/30"
+                      >
+                        초기화
+                      </button>
+                    </div>
                   </div>
                 </div>
 

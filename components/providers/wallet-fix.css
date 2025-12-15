@@ -1,0 +1,8 @@
+/* Fix Solana Wallet Adapter Modal Z-Index */
+.wallet-adapter-modal-wrapper {
+  z-index: 9999 !important;
+}
+
+.wallet-adapter-modal-overlay {
+  z-index: 9998 !important;
+}

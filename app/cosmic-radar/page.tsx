@@ -16,9 +16,33 @@ import {
   ExternalLink,
   Calendar,
   AlertTriangle,
-  MessageSquare
+  MessageSquare,
+  Sparkles,
+  RefreshCw,
+  Clock
 } from 'lucide-react'
 import { MembershipTier, MEMBERSHIP_TIERS } from '@/types'
+
+// Daily Brief 인터페이스
+interface DailyBrief {
+  id: string
+  date: string
+  title: string
+  summary: string
+  full_content: string | null
+  market_sentiment: 'bullish' | 'bearish' | 'neutral'
+  btc_price: number
+  eth_price: number
+  btc_change_24h: number
+  eth_change_24h: number
+  fear_greed_index: number
+  predictions: string[]
+  locked?: boolean
+  message?: string
+  summaryOnly?: boolean
+  fullAccess?: boolean
+  unlocksAt?: string
+}
 
 // 접근 권한 레벨 정의
 const ACCESS_LEVELS: Record<MembershipTier, number> = {
@@ -31,6 +55,7 @@ const ACCESS_LEVELS: Record<MembershipTier, number> = {
 
 // 섹션별 필요 권한
 const SECTION_ACCESS = {
+  dailyBrief: 'navigator' as MembershipTier,
   institution: 'navigator' as MembershipTier,
   whale: 'navigator' as MembershipTier,
   signal: 'pilot' as MembershipTier,
@@ -152,6 +177,206 @@ function LiveIndicator() {
   )
 }
 
+// Daily Brief 섹션 컴포넌트
+function DailyBriefSection({
+  userTier,
+  brief,
+  loading,
+  onRefresh,
+}: {
+  userTier: MembershipTier
+  brief: DailyBrief | null
+  loading: boolean
+  onRefresh: () => void
+}) {
+  const hasAccess = ACCESS_LEVELS[userTier] >= ACCESS_LEVELS[SECTION_ACCESS.dailyBrief]
+
+  const getSentimentColor = (sentiment?: string) => {
+    switch (sentiment) {
+      case 'bullish': return 'text-green-400'
+      case 'bearish': return 'text-red-400'
+      default: return 'text-yellow-400'
+    }
+  }
+
+  const getSentimentEmoji = (sentiment?: string) => {
+    switch (sentiment) {
+      case 'bullish': return '🚀'
+      case 'bearish': return '📉'
+      default: return '⚖️'
+    }
+  }
+
+  const getFearGreedLabel = (index: number) => {
+    if (index <= 25) return '극도의 공포'
+    if (index <= 45) return '공포'
+    if (index <= 55) return '중립'
+    if (index <= 75) return '탐욕'
+    return '극도의 탐욕'
+  }
+
+  return (
+    <div className="relative glass rounded-2xl p-6 mb-8 overflow-hidden">
+      {/* 배경 그라데이션 */}
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-cyan-500/10" />
+
+      <div className="relative">
+        {/* 헤더 */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 flex items-center justify-center">
+              <Sparkles className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                AI Daily Brief
+                <span className="px-2 py-0.5 bg-gradient-to-r from-purple-500 to-cyan-500 text-white text-xs rounded-full">
+                  NEW
+                </span>
+              </h2>
+              <p className="text-gray-400 text-sm">Claude AI가 분석한 오늘의 시장 브리핑</p>
+            </div>
+          </div>
+          <button
+            onClick={onRefresh}
+            disabled={loading}
+            className="p-2 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+
+        {/* 콘텐츠 */}
+        {!hasAccess ? (
+          <div className="text-center py-8">
+            <Lock className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+            <p className="text-white font-medium mb-2">
+              🔒 Navigator 이상 멤버십이 필요합니다
+            </p>
+            <Link href="/membership">
+              <button className="mt-4 px-6 py-2 bg-gradient-to-r from-purple-600 to-cyan-500 rounded-full text-white font-medium hover:opacity-90 transition-opacity">
+                멤버십 업그레이드
+              </button>
+            </Link>
+          </div>
+        ) : loading ? (
+          <div className="space-y-4 animate-pulse">
+            <div className="h-20 bg-purple-500/20 rounded-xl" />
+            <div className="h-32 bg-purple-500/20 rounded-xl" />
+          </div>
+        ) : brief?.locked ? (
+          <div className="text-center py-8">
+            <Clock className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
+            <p className="text-white font-medium mb-2">{brief.message}</p>
+            {brief.unlocksAt && (
+              <p className="text-gray-400 text-sm">열람 가능일: {brief.unlocksAt}</p>
+            )}
+            <Link href="/membership">
+              <button className="mt-4 px-6 py-2 bg-gradient-to-r from-purple-600 to-cyan-500 rounded-full text-white font-medium hover:opacity-90 transition-opacity">
+                지금 바로 열람하기
+              </button>
+            </Link>
+          </div>
+        ) : brief ? (
+          <>
+            {/* 시장 데이터 카드 */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-space-800 rounded-xl p-4">
+                <p className="text-gray-400 text-sm mb-1">BTC</p>
+                <p className="text-white font-bold">${brief.btc_price?.toLocaleString()}</p>
+                <p className={`text-sm ${brief.btc_change_24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {brief.btc_change_24h >= 0 ? '+' : ''}{brief.btc_change_24h?.toFixed(2)}%
+                </p>
+              </div>
+              <div className="bg-space-800 rounded-xl p-4">
+                <p className="text-gray-400 text-sm mb-1">ETH</p>
+                <p className="text-white font-bold">${brief.eth_price?.toLocaleString()}</p>
+                <p className={`text-sm ${brief.eth_change_24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {brief.eth_change_24h >= 0 ? '+' : ''}{brief.eth_change_24h?.toFixed(2)}%
+                </p>
+              </div>
+              <div className="bg-space-800 rounded-xl p-4">
+                <p className="text-gray-400 text-sm mb-1">Fear & Greed</p>
+                <p className="text-white font-bold">{brief.fear_greed_index}</p>
+                <p className="text-sm text-yellow-400">{getFearGreedLabel(brief.fear_greed_index)}</p>
+              </div>
+              <div className="bg-space-800 rounded-xl p-4">
+                <p className="text-gray-400 text-sm mb-1">시장 심리</p>
+                <p className={`font-bold ${getSentimentColor(brief.market_sentiment)}`}>
+                  {getSentimentEmoji(brief.market_sentiment)} {
+                    brief.market_sentiment === 'bullish' ? '강세' :
+                    brief.market_sentiment === 'bearish' ? '약세' : '중립'
+                  }
+                </p>
+              </div>
+            </div>
+
+            {/* 요약 */}
+            <div className="bg-gradient-to-r from-purple-500/10 to-cyan-500/10 rounded-xl p-5 mb-6 border border-purple-500/20">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">🤖</span>
+                <h3 className="text-white font-medium">AI 요약</h3>
+                <span className="text-gray-500 text-sm">{brief.date}</span>
+              </div>
+              <p className="text-gray-300 leading-relaxed">{brief.summary}</p>
+            </div>
+
+            {/* 전체 내용 (Commander 이상) */}
+            {brief.fullAccess && brief.full_content && (
+              <div className="bg-space-800 rounded-xl p-5 mb-6">
+                <h3 className="text-white font-medium mb-3 flex items-center gap-2">
+                  <Crown className="w-4 h-4 text-amber-400" />
+                  전체 분석
+                </h3>
+                <div className="text-gray-300 prose prose-invert prose-sm max-w-none whitespace-pre-wrap">
+                  {brief.full_content}
+                </div>
+              </div>
+            )}
+
+            {/* 요약만 보이는 경우 안내 */}
+            {brief.summaryOnly && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6">
+                <p className="text-amber-400 text-sm flex items-center gap-2">
+                  <Lock className="w-4 h-4" />
+                  {brief.message || '전체 내용은 Commander 이상에서 확인 가능합니다'}
+                </p>
+                <Link href="/membership">
+                  <button className="mt-3 text-sm text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1">
+                    업그레이드하기 <ArrowRight className="w-4 h-4" />
+                  </button>
+                </Link>
+              </div>
+            )}
+
+            {/* 예측 */}
+            {brief.predictions && brief.predictions.length > 0 && (
+              <div className="bg-space-800 rounded-xl p-5">
+                <h3 className="text-white font-medium mb-3 flex items-center gap-2">
+                  <Telescope className="w-4 h-4 text-cyan-400" />
+                  단기 예측
+                </h3>
+                <ul className="space-y-2">
+                  {brief.predictions.map((pred, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-gray-300 text-sm">
+                      <span className="text-cyan-400">•</span>
+                      {pred}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-400">오늘의 브리핑이 아직 생성되지 않았습니다</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // 섹션 래퍼 컴포넌트
 function Section({
   title,
@@ -209,6 +434,33 @@ export default function CosmicRadarPage() {
   // 데모를 위해 useState로 관리
   const [userTier, setUserTier] = useState<MembershipTier>('cadet')
   const [selectedCrypto, setSelectedCrypto] = useState<'btc' | 'eth' | 'sol' | 'xrp'>('btc')
+
+  // Daily Brief 상태
+  const [dailyBrief, setDailyBrief] = useState<DailyBrief | null>(null)
+  const [briefLoading, setBriefLoading] = useState(false)
+
+  // Daily Brief 가져오기
+  const fetchDailyBrief = async () => {
+    setBriefLoading(true)
+    try {
+      const response = await fetch(`/api/cosmic-radar/daily-brief?tier=${userTier}&latest=true`)
+      const data = await response.json()
+      if (data.brief) {
+        setDailyBrief(data.brief)
+      }
+    } catch (error) {
+      console.error('Error fetching daily brief:', error)
+    } finally {
+      setBriefLoading(false)
+    }
+  }
+
+  // 컴포넌트 마운트 시 및 등급 변경 시 브리핑 가져오기
+  useEffect(() => {
+    if (userTier !== 'cadet') {
+      fetchDailyBrief()
+    }
+  }, [userTier])
 
   // Cadet인 경우 잠금 화면 표시
   if (userTier === 'cadet') {
@@ -332,13 +584,20 @@ export default function CosmicRadarPage() {
           </div>
         </div>
 
+        {/* 🤖 AI Daily Brief */}
+        <DailyBriefSection
+          userTier={userTier}
+          brief={dailyBrief}
+          loading={briefLoading}
+          onRefresh={fetchDailyBrief}
+        />
+
         {/* 🏦 기관 레이더 */}
         <Section
           title="기관 레이더"
           icon={Building2}
           userTier={userTier}
           requiredTier={SECTION_ACCESS.institution}
-          isNew
         >
           {/* 암호화폐 선택 탭 */}
           <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
